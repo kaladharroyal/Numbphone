@@ -1,0 +1,277 @@
+package com.minimalphone.feature.appslist
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.minimalphone.core.model.AppCategory
+import com.minimalphone.core.model.InstalledApp
+import com.minimalphone.core.ui.theme.DarkSurface
+import com.minimalphone.core.ui.theme.MutedText
+import com.minimalphone.core.ui.theme.PureBlack
+
+@Composable
+fun AppsManagementScreen(
+    onNavigateBack: () -> Unit,
+    viewModel: AppsManagementViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .safeDrawingPadding()
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // Top Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Back",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                    Text(
+                        text = "App Rules & Classification",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+
+                IconButton(onClick = { viewModel.refreshApps() }) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = "Refresh apps",
+                        tint = MutedText
+                    )
+                }
+            }
+
+            // Search Bar
+            OutlinedTextField(
+                value = uiState.searchQuery,
+                onValueChange = { viewModel.onSearchQueryChanged(it) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                placeholder = { Text("Search installed apps...", color = MutedText) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Search",
+                        tint = MutedText
+                    )
+                },
+                trailingIcon = {
+                    if (uiState.searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.onSearchQueryChanged("") }) {
+                            Icon(
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = "Clear",
+                                tint = MutedText
+                            )
+                        }
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                )
+            )
+
+            // Filter Chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = uiState.activeFilter == AppListFilter.ALL,
+                    onClick = { viewModel.onFilterSelected(AppListFilter.ALL) },
+                    label = { Text("All (${uiState.totalAppsCount})") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        labelColor = MutedText
+                    )
+                )
+
+                FilterChip(
+                    selected = uiState.activeFilter == AppListFilter.ESSENTIAL,
+                    onClick = { viewModel.onFilterSelected(AppListFilter.ESSENTIAL) },
+                    label = { Text("Always Available (${uiState.essentialCount})") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        labelColor = MutedText
+                    )
+                )
+
+                FilterChip(
+                    selected = uiState.activeFilter == AppListFilter.MANAGED,
+                    onClick = { viewModel.onFilterSelected(AppListFilter.MANAGED) },
+                    label = { Text("Managed (${uiState.managedCount})") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        labelColor = MutedText
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // App Rules List / Empty state
+            if (uiState.apps.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (uiState.searchQuery.isNotEmpty()) "No applications matching \"${uiState.searchQuery}\"" else "No applications found",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MutedText
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    items(
+                        items = uiState.apps,
+                        key = { it.packageName }
+                    ) { app ->
+                        AppManagementRow(
+                            app = app,
+                            onToggleCategory = { viewModel.toggleAppCategory(app) },
+                            onToggleFavorite = { viewModel.toggleFavoriteOnHome(app) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AppManagementRow(
+    app: InstalledApp,
+    onToggleCategory: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isEssential = app.category == AppCategory.ESSENTIAL
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = app.label,
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp),
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = if (isEssential) "Always Available (Essential)" else "Managed (Blocked during focus)",
+                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+                color = if (isEssential) Color(0xFF32D74B) else MutedText
+            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Home Favorite Pin
+            IconButton(onClick = onToggleFavorite) {
+                Icon(
+                    imageVector = if (app.isFavoriteOnHome) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                    contentDescription = "Pin to home",
+                    tint = if (app.isFavoriteOnHome) Color(0xFFFFD60A) else MutedText
+                )
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // Always Available vs Managed Toggle
+            Switch(
+                checked = isEssential,
+                onCheckedChange = { onToggleCategory() },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    uncheckedThumbColor = MutedText,
+                    uncheckedTrackColor = DarkSurface
+                )
+            )
+        }
+    }
+}
