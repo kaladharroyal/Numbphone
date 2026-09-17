@@ -28,6 +28,21 @@ object AppLauncher {
     }
 
     fun openDefaultLauncherSettings(context: Context) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            try {
+                val roleManager = context.getSystemService(android.app.role.RoleManager::class.java)
+                if (roleManager != null && roleManager.isRoleAvailable(android.app.role.RoleManager.ROLE_HOME)) {
+                    val intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_HOME).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                    return
+                }
+            } catch (e: Exception) {
+                MinimalLog.w(TAG, "RoleManager home request failed, falling back to settings", e)
+            }
+        }
+
         try {
             val intent = Intent(Settings.ACTION_HOME_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -40,10 +55,18 @@ object AppLauncher {
                 }
                 context.startActivity(intent)
             } catch (e2: Exception) {
-                val intent = Intent(Settings.ACTION_SETTINGS).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                try {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.parse("package:${context.packageName}")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
+                } catch (e3: Exception) {
+                    val intent = Intent(Settings.ACTION_SETTINGS).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(intent)
                 }
-                context.startActivity(intent)
             }
         }
     }

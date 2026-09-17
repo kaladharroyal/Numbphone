@@ -116,8 +116,7 @@ class OnboardingViewModel @Inject constructor(
     }
 
     fun openDefaultLauncherSettings() {
-        val intent = SystemHealthHelper.createDefaultLauncherSettingsIntent(context)
-        context.startActivity(intent)
+        SystemHealthHelper.openDefaultLauncherSettings(context)
     }
 
     fun openAccessibilitySettings() {

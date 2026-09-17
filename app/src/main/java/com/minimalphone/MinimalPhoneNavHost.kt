@@ -141,6 +141,9 @@ fun MinimalPhoneNavHost(
             AppsManagementScreen(
                 onNavigateBack = {
                     navController.popBackStack()
+                },
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route)
                 }
             )
         }

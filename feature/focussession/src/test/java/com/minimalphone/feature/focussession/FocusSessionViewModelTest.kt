@@ -110,6 +110,7 @@ class FocusSessionViewModelTest {
         val abortExitAttemptUseCase = AbortExitAttemptUseCase(exitRepo, repository)
 
         viewModel = FocusSessionViewModel(
+            context = io.mockk.mockk(relaxed = true),
             getFocusGoalsUseCase = getFocusGoalsUseCase,
             getActiveFocusSessionUseCase = getActiveFocusSessionUseCase,
             observeFocusSessionTickerUseCase = observeFocusSessionTickerUseCase,

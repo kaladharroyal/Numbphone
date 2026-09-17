@@ -41,6 +41,7 @@ data class FocusSessionUiState(
 
 @HiltViewModel
 class FocusSessionViewModel @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
     private val getFocusGoalsUseCase: GetFocusGoalsUseCase,
     private val getActiveFocusSessionUseCase: GetActiveFocusSessionUseCase,
     private val observeFocusSessionTickerUseCase: ObserveFocusSessionTickerUseCase,
@@ -157,6 +158,7 @@ class FocusSessionViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = { session ->
+                    com.minimalphone.core.common.DndHelper.enablePriorityCallsOnlyDnd(context)
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isSessionActive = true,
@@ -180,6 +182,7 @@ class FocusSessionViewModel @Inject constructor(
             // If session is in LIGHT mode, allow direct completion without friction delay
             if (session.mode == FocusMode.LIGHT) {
                 completeFocusSessionUseCase(session.id)
+                com.minimalphone.core.common.DndHelper.restoreNormalNotifications(context)
                 return@launch
             }
 
@@ -212,6 +215,7 @@ class FocusSessionViewModel @Inject constructor(
                 completedFrictionSeconds = completedSeconds,
                 exitReason = exitReason
             )
+            com.minimalphone.core.common.DndHelper.restoreNormalNotifications(context)
             _uiState.value = _uiState.value.copy(
                 pendingExitAttempt = null,
                 isSessionActive = false,
@@ -224,6 +228,7 @@ class FocusSessionViewModel @Inject constructor(
         viewModelScope.launch {
             val sessionId = _uiState.value.activeSession?.id ?: return@launch
             completeFocusSessionUseCase(sessionId)
+            com.minimalphone.core.common.DndHelper.restoreNormalNotifications(context)
         }
     }
 

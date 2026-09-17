@@ -45,21 +45,48 @@ class MinimalAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
-        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            event.eventType != AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
 
         val targetPackage = event.packageName?.toString() ?: return
         if (targetPackage.isBlank()) return
 
+        val className = event.className?.toString() ?: ""
+
         val currentTime = System.currentTimeMillis()
-        if (targetPackage == lastCheckedPackage && (currentTime - lastCheckedTime) < DEBOUNCE_WINDOW_MS) {
+        if (targetPackage == lastCheckedPackage && className == lastCheckedClass && (currentTime - lastCheckedTime) < DEBOUNCE_WINDOW_MS) {
             return
         }
 
         lastCheckedPackage = targetPackage
+        lastCheckedClass = className
         lastCheckedTime = currentTime
 
         // Fast exclusion: Skip Minimal Phone itself to prevent redirect loops
         if (targetPackage == packageName || targetPackage.startsWith("com.minimalphone")) {
+            return
+        }
+
+        // Intercept System UI Recents Overview / Quick Settings / Notification Shade
+        if (isSystemUiOrRecents(targetPackage, className)) {
+            serviceScope.launch {
+                try {
+                    when (val decision = evaluateBypassRouteUseCase(targetPackage)) {
+                        is BypassDecision.InterceptAndRedirect -> {
+                            MinimalLog.w(TAG, "Blocked System UI Recents / Notification shade during focus. Returning to home.")
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                                performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE)
+                            }
+                            performGlobalAction(GLOBAL_ACTION_HOME)
+                        }
+                        is BypassDecision.Allow -> {
+                            // Allowed
+                        }
+                    }
+                } catch (e: Exception) {
+                    MinimalLog.e(TAG, "Error intercepting system UI", e)
+                }
+            }
             return
         }
 
@@ -89,6 +116,21 @@ class MinimalAccessibilityService : AccessibilityService() {
                 MinimalLog.e(TAG, "Error evaluating bypass route for package: $targetPackage", e)
             }
         }
+    }
+
+    private var lastCheckedClass: String? = null
+
+    private fun isSystemUiOrRecents(pkg: String, className: String): Boolean {
+        val lowerClass = className.lowercase()
+        val lowerPkg = pkg.lowercase()
+        return lowerPkg.contains("systemui") ||
+               lowerPkg.contains("nexuslauncher") ||
+               lowerPkg.contains("quickstep") ||
+               lowerClass.contains("recents") ||
+               lowerClass.contains("overview") ||
+               lowerClass.contains("notificationshade") ||
+               lowerClass.contains("notificationpanel") ||
+               lowerClass.contains("quicksettings")
     }
 
     private fun returnToHomeScreen() {

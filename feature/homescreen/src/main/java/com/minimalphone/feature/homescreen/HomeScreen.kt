@@ -49,32 +49,24 @@ fun HomeScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(PureBlack)
+            .background(MaterialTheme.colorScheme.background)
             .safeDrawingPadding()
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header: Screen Time button & Settings button
+            // Header: Screen Time button (Settings removed from top bar)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.Start
             ) {
                 IconButton(onClick = onNavigateToScreenTime) {
                     Icon(
                         imageVector = Icons.Outlined.BarChart,
                         contentDescription = "Screen Time",
-                        tint = MutedText
-                    )
-                }
-
-                IconButton(onClick = onNavigateToSettings) {
-                    Icon(
-                        imageVector = Icons.Outlined.Settings,
-                        contentDescription = "Settings",
                         tint = MutedText
                     )
                 }

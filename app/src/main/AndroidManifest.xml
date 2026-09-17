@@ -5,6 +5,8 @@
     <!-- Launcher and Essential System Permissions -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
@@ -33,6 +35,9 @@
             android:launchMode="singleTask"
             android:clearTaskOnLaunch="true"
             android:stateNotNeeded="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:showForAllUsers="true"
             android:theme="@style/Theme.MinimalPhone">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

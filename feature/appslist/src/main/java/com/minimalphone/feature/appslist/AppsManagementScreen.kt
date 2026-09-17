@@ -12,12 +12,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Refresh
@@ -51,6 +53,7 @@ import com.minimalphone.core.ui.theme.PureBlack
 @Composable
 fun AppsManagementScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     viewModel: AppsManagementViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -209,6 +212,45 @@ fun AppsManagementScreen(
                             onToggleCategory = { viewModel.toggleAppCategory(app) },
                             onToggleFavorite = { viewModel.toggleFavoriteOnHome(app) }
                         )
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                                .clickable { onNavigateToSettings() }
+                                .padding(16.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Minimal Phone Settings",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Themes, DND Mode, Portability & Suggestions",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MutedText
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                                    contentDescription = "Settings",
+                                    tint = MutedText
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
             }

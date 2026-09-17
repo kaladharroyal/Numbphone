@@ -76,6 +76,9 @@ fun SettingsScreen(
     var importJsonText by remember { mutableStateOf("") }
     var importErrorText by remember { mutableStateOf<String?>(null) }
 
+    var showFeedbackDialog by remember { mutableStateOf(false) }
+    var feedbackText by remember { mutableStateOf("") }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -171,7 +174,20 @@ fun SettingsScreen(
                     )
                 }
 
-                // Section 2: Focus & Friction
+                // Section 2: DND & Notification Control
+                item {
+                    SectionHeader(title = "NOTIFICATIONS & DND MODE")
+                }
+
+                item {
+                    val isDndGranted = com.minimalphone.core.common.DndHelper.isNotificationPolicyAccessGranted(context)
+                    DndControlCard(
+                        isGranted = isDndGranted,
+                        onGrantPermission = { com.minimalphone.core.common.DndHelper.openNotificationPolicySettings(context) }
+                    )
+                }
+
+                // Section 3: Focus & Friction
                 item {
                     SectionHeader(title = "FOCUS & FRICTION")
                 }
@@ -192,7 +208,7 @@ fun SettingsScreen(
                     )
                 }
 
-                // Section 3: Applications & Whitelist
+                // Section 4: Applications & Whitelist
                 item {
                     SectionHeader(title = "APPLICATIONS")
                 }
@@ -205,7 +221,18 @@ fun SettingsScreen(
                     )
                 }
 
-                // Section 4: Data Portability & Backup
+                // Section 5: Suggestions & Feedback
+                item {
+                    SectionHeader(title = "SUGGESTIONS & TIPS")
+                }
+
+                item {
+                    SuggestionsAndTipsCard(
+                        onOpenFeedback = { showFeedbackDialog = true }
+                    )
+                }
+
+                // Section 6: Data Portability & Backup
                 item {
                     SectionHeader(title = "LOCAL DATA BACKUP & RESTORE")
                 }
@@ -228,7 +255,7 @@ fun SettingsScreen(
                     )
                 }
 
-                // Section 5: System Health & Diagnostics
+                // Section 7: System Health & Diagnostics
                 item {
                     SectionHeader(title = "SYSTEM HEALTH")
                 }
@@ -241,7 +268,7 @@ fun SettingsScreen(
                     )
                 }
 
-                // Section 6: Onboarding & Privacy
+                // Section 8: Onboarding & Privacy
                 item {
                     SectionHeader(title = "ONBOARDING & PRIVACY")
                 }
@@ -336,6 +363,154 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+
+    // Feedback & Suggestions Dialog
+    if (showFeedbackDialog) {
+        AlertDialog(
+            onDismissRequest = { showFeedbackDialog = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            title = {
+                Text(
+                    text = "Submit Suggestion / Feedback",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Have an idea to make Minimal Phone better or found an issue? Write your feedback below:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MutedText
+                    )
+                    OutlinedTextField(
+                        value = feedbackText,
+                        onValueChange = { feedbackText = it },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(130.dp),
+                        placeholder = { Text("E.g. Add scheduled night focus sessions, custom font size...", color = MutedText) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (feedbackText.isNotBlank()) {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("MinimalPhone_Feedback", feedbackText)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "Feedback copied to clipboard! Thank you!", Toast.LENGTH_LONG).show()
+                            feedbackText = ""
+                            showFeedbackDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Text("Copy Feedback")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFeedbackDialog = false }) {
+                    Text("Cancel", color = MutedText)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun DndControlCard(
+    isGranted: Boolean,
+    onGrantPermission: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Do Not Disturb (Calls Only)",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = if (isGranted) "DND Policy Active: notifications silenced during sessions, phone calls allowed." else "Permission required to automatically silence notifications during focus.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isGranted) Color(0xFF32D74B) else MutedText
+                )
+            }
+            if (!isGranted) {
+                Spacer(modifier = Modifier.width(12.dp))
+                Button(
+                    onClick = onGrantPermission,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Enable", fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SuggestionsAndTipsCard(
+    onOpenFeedback: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "Study & Focus Techniques",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = "• Place phone screen face-down and out of arm's reach during deep study.\n• Use 25-minute Pomodoro intervals for maximum retention.\n• Keep only Phone and Messages in Always Available to eliminate dopamine loops.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MutedText,
+            lineHeight = 20.sp
+        )
+
+        OutlinedButton(
+            onClick = onOpenFeedback,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+        ) {
+            Text("Send Feedback or Suggest a Feature", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
+        }
     }
 }
 
