@@ -115,8 +115,8 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
-    fun openDefaultLauncherSettings() {
-        SystemHealthHelper.openDefaultLauncherSettings(context)
+    fun openDefaultLauncherSettings(targetContext: Context? = null) {
+        SystemHealthHelper.openDefaultLauncherSettings(targetContext ?: context)
     }
 
     fun openAccessibilitySettings() {

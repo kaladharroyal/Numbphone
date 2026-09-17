@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -50,6 +51,7 @@ fun OnboardingScreen(
     viewModel: OnboardingViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     LaunchedEffect(uiState.currentStep) {
         viewModel.refreshState()
@@ -80,7 +82,7 @@ fun OnboardingScreen(
                     OnboardingStep.VISION -> VisionStepContent()
                     OnboardingStep.DEFAULT_LAUNCHER -> DefaultLauncherStepContent(
                         isDefault = uiState.isDefaultLauncher,
-                        onOpenSettings = { viewModel.openDefaultLauncherSettings() }
+                        onOpenSettings = { viewModel.openDefaultLauncherSettings(context) }
                     )
                     OnboardingStep.PERMISSIONS -> PermissionsStepContent(
                         isAccessibility = uiState.isAccessibilityEnabled,

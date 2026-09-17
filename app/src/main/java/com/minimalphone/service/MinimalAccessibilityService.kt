@@ -8,8 +8,10 @@ import com.minimalphone.MainActivity
 import com.minimalphone.core.common.MinimalLog
 import com.minimalphone.core.domain.bypass.EvaluateBypassRouteUseCase
 import com.minimalphone.core.domain.bypass.RecordBypassAttemptUseCase
+import com.minimalphone.core.data.repository.FocusSessionRepository
 import com.minimalphone.core.model.BypassDecision
 import com.minimalphone.core.model.BypassRoute
+import com.minimalphone.core.model.FocusMode
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +28,9 @@ class MinimalAccessibilityService : AccessibilityService() {
 
     @Inject
     lateinit var recordBypassAttemptUseCase: RecordBypassAttemptUseCase
+
+    @Inject
+    lateinit var focusSessionRepository: FocusSessionRepository
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -71,17 +76,19 @@ class MinimalAccessibilityService : AccessibilityService() {
         if (isSystemUiOrRecents(targetPackage, className)) {
             serviceScope.launch {
                 try {
-                    when (val decision = evaluateBypassRouteUseCase(targetPackage)) {
-                        is BypassDecision.InterceptAndRedirect -> {
-                            MinimalLog.w(TAG, "Blocked System UI Recents / Notification shade during focus. Returning to home.")
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                                performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE)
-                            }
-                            performGlobalAction(GLOBAL_ACTION_HOME)
+                    val activeSession = focusSessionRepository.getActiveSessionSync()
+                    if (activeSession != null && activeSession.isCurrentlyActive &&
+                        (activeSession.mode == FocusMode.STRICT || activeSession.mode == FocusMode.DEEP_FOCUS)
+                    ) {
+                        MinimalLog.w(TAG, "Blocked System UI Recents / Notification shade during focus (${activeSession.mode}). Dismissing.")
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                            performGlobalAction(GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE)
                         }
-                        is BypassDecision.Allow -> {
-                            // Allowed
-                        }
+                        returnToHomeScreen()
+                        recordBypassAttemptUseCase(
+                            packageName = targetPackage,
+                            route = BypassRoute.NOTIFICATION
+                        )
                     }
                 } catch (e: Exception) {
                     MinimalLog.e(TAG, "Error intercepting system UI", e)

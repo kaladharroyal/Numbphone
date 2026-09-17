@@ -114,6 +114,9 @@ fun MinimalPhoneNavHost(
                 },
                 onNavigateToScreenTime = {
                     navController.navigate(Screen.ScreenTime.route)
+                },
+                onNavigateToApps = {
+                    navController.navigate(Screen.AppsList.route)
                 }
             )
         }

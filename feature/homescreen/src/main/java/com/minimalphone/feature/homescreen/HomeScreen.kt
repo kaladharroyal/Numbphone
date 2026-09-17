@@ -42,6 +42,13 @@ import com.minimalphone.core.ui.components.MinimalClockHeader
 import com.minimalphone.core.ui.theme.MutedText
 import com.minimalphone.core.ui.theme.PureBlack
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+
 @Composable
 fun HomeScreen(
     onNavigateToSettings: () -> Unit,
@@ -52,6 +59,7 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var showControlPanel by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -63,7 +71,7 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header: Screen Time button (left) and Settings button (right)
+            // Header: Screen Time (left), Control Center (center), Settings (right)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -78,6 +86,16 @@ fun HomeScreen(
                         tint = MutedText
                     )
                 }
+
+                // Center: Quick Control Center & Notification Shield Button
+                IconButton(onClick = { showControlPanel = true }) {
+                    Icon(
+                        imageVector = Icons.Outlined.Tune,
+                        contentDescription = "Control Center & Notifications",
+                        tint = MutedText
+                    )
+                }
+
                 IconButton(onClick = onNavigateToSettings) {
                     Icon(
                         imageVector = Icons.Outlined.Settings,
@@ -94,9 +112,17 @@ fun HomeScreen(
                     .weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                MinimalClockHeader(
-                    modifier = Modifier.padding(top = 8.dp, bottom = 28.dp)
-                )
+                Box(
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { showControlPanel = true }
+                    )
+                ) {
+                    MinimalClockHeader(
+                        modifier = Modifier.padding(top = 8.dp, bottom = 28.dp)
+                    )
+                }
 
                 LazyColumn(
                     modifier = Modifier
@@ -173,6 +199,16 @@ fun HomeScreen(
                 onSubmitReflection = { reason ->
                     viewModel.onRecordReflection(reason)
                 }
+            )
+        }
+
+        // Minimalist Control Center & Notification Shield Sheet
+        if (showControlPanel) {
+            MinimalControlPanelSheet(
+                onDismiss = { showControlPanel = false },
+                onNavigateToFocus = onNavigateToFocus,
+                onNavigateToScreenTime = onNavigateToScreenTime,
+                onNavigateToSettings = onNavigateToSettings
             )
         }
     }

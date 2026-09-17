@@ -43,21 +43,6 @@ object SystemHealthHelper {
     }
 
     fun openDefaultLauncherSettings(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            try {
-                val roleManager = context.getSystemService(RoleManager::class.java)
-                if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_HOME)) {
-                    val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_HOME).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
-                    context.startActivity(intent)
-                    return
-                }
-            } catch (e: Exception) {
-                MinimalLog.w("SystemHealthHelper", "RoleManager home request failed, attempting fallback", e)
-            }
-        }
-
         val intents = listOf(
             Intent(Settings.ACTION_HOME_SETTINGS).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
             Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK },
@@ -74,17 +59,23 @@ object SystemHealthHelper {
                 return
             } catch (_: Exception) {}
         }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val roleManager = context.getSystemService(RoleManager::class.java)
+                if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_HOME)) {
+                    val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_HOME).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                }
+            } catch (e: Exception) {
+                MinimalLog.w("SystemHealthHelper", "RoleManager fallback failed", e)
+            }
+        }
     }
 
     fun createDefaultLauncherSettingsIntent(context: Context): Intent {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val roleManager = context.getSystemService(RoleManager::class.java)
-            if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_HOME)) {
-                return roleManager.createRequestRoleIntent(RoleManager.ROLE_HOME).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                }
-            }
-        }
         return Intent(Settings.ACTION_HOME_SETTINGS).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
