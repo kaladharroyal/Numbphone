@@ -56,17 +56,25 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header: Screen Time button (Settings removed from top bar)
+            // Header: Screen Time button (left) and Settings button (right)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.Start
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onNavigateToScreenTime) {
                     Icon(
                         imageVector = Icons.Outlined.BarChart,
                         contentDescription = "Screen Time",
+                        tint = MutedText
+                    )
+                }
+                IconButton(onClick = onNavigateToSettings) {
+                    Icon(
+                        imageVector = Icons.Outlined.Settings,
+                        contentDescription = "Settings",
                         tint = MutedText
                     )
                 }
