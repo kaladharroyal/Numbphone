@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Minimal Phone</string>
+    <string name="accessibility_service_description">Minimal Phone uses this accessibility service exclusively as a backstop to detect when distracting apps are opened through notifications, recent apps, or external links during an active focus session, safely returning you to your focus goal. No keystrokes, personal data, or screen content are ever monitored, captured, or transmitted.</string>
+    <string name="accessibility_service_summary">Focus mode bypass protection</string>
+</resources>
