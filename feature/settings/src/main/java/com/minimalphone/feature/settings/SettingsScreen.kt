@@ -3,6 +3,8 @@ package com.minimalphone.feature.settings
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -76,8 +78,7 @@ fun SettingsScreen(
     var importJsonText by remember { mutableStateOf("") }
     var importErrorText by remember { mutableStateOf<String?>(null) }
 
-    var showFeedbackDialog by remember { mutableStateOf(false) }
-    var feedbackText by remember { mutableStateOf("") }
+    val feedbackFormUrl = "https://forms.gle/T3xsTRHTx2uDaoVP6"
 
     Box(
         modifier = Modifier
@@ -228,7 +229,11 @@ fun SettingsScreen(
 
                 item {
                     SuggestionsAndTipsCard(
-                        onOpenFeedback = { showFeedbackDialog = true }
+                        onOpenFeedback = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(feedbackFormUrl))
+                                .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                            context.startActivity(intent)
+                        }
                     )
                 }
 
@@ -365,68 +370,6 @@ fun SettingsScreen(
         )
     }
 
-    // Feedback & Suggestions Dialog
-    if (showFeedbackDialog) {
-        AlertDialog(
-            onDismissRequest = { showFeedbackDialog = false },
-            containerColor = MaterialTheme.colorScheme.surface,
-            title = {
-                Text(
-                    text = "Submit Suggestion / Feedback",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Have an idea to make Minimal Phone better or found an issue? Write your feedback below:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MutedText
-                    )
-                    OutlinedTextField(
-                        value = feedbackText,
-                        onValueChange = { feedbackText = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(130.dp),
-                        placeholder = { Text("E.g. Add scheduled night focus sessions, custom font size...", color = MutedText) },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (feedbackText.isNotBlank()) {
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("MinimalPhone_Feedback", feedbackText)
-                            clipboard.setPrimaryClip(clip)
-                            Toast.makeText(context, "Feedback copied to clipboard! Thank you!", Toast.LENGTH_LONG).show()
-                            feedbackText = ""
-                            showFeedbackDialog = false
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                ) {
-                    Text("Copy Feedback")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showFeedbackDialog = false }) {
-                    Text("Cancel", color = MutedText)
-                }
-            }
-        )
-    }
 }
 
 @Composable
