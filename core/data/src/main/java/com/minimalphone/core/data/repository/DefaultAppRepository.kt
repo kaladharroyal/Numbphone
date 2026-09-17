@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.UserHandle
 import com.minimalphone.core.common.MinimalLog
+import com.minimalphone.core.data.defaults.DefaultsBootstrapper
 import com.minimalphone.core.data.db.dao.AppRuleDao
 import com.minimalphone.core.data.db.dao.InstalledAppDao
 import com.minimalphone.core.data.db.entity.AppRuleEntity
@@ -31,7 +32,8 @@ class DefaultAppRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val appScanner: AppScanner,
     private val installedAppDao: InstalledAppDao,
-    private val appRuleDao: AppRuleDao
+    private val appRuleDao: AppRuleDao,
+    private val defaultsBootstrapper: DefaultsBootstrapper
 ) : AppRepository {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -68,6 +70,8 @@ class DefaultAppRepository @Inject constructor(
         registerLauncherCallback()
         scope.launch {
             syncInstalledApps()
+            // Pin the 6 essential apps to home on first install only
+            defaultsBootstrapper.bootstrapIfNeeded()
         }
     }
 

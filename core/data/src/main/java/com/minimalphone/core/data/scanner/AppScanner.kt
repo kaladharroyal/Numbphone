@@ -149,45 +149,59 @@ class AppScanner @Inject constructor(
     companion object {
         private const val TAG = "AppScanner"
 
+        /**
+         * The 6 curated essential apps shown on the Minimal Home Screen by default.
+         * Detected by label OR package name to be OEM-agnostic.
+         *   1. Phone / Dialer
+         *   2. Messages / SMS
+         *   3. Camera
+         *   4. Clock / Alarm
+         *   5. Contacts
+         *   6. Calendar
+         */
         fun isEssentialPackage(packageName: String, label: String): Boolean {
             val lowerPkg = packageName.lowercase()
             val lowerLabel = label.lowercase()
 
-            // Essential phone tools
-            if (lowerLabel == "phone" || lowerLabel == "dialer" || lowerPkg.contains("dialer") || lowerPkg.contains("telecom")) {
-                return true
-            }
-            if (lowerLabel == "messages" || lowerLabel == "sms" || lowerPkg.contains("messaging") || lowerPkg.contains("mms")) {
-                return true
-            }
-            if (lowerLabel == "camera" || lowerPkg.contains("camera")) {
-                return true
-            }
-            if (lowerLabel == "clock" || lowerLabel == "alarm" || lowerPkg.contains("deskclock")) {
-                return true
-            }
-            if (lowerLabel == "contacts" || lowerPkg.contains("contacts")) {
-                return true
-            }
-            if (lowerLabel == "settings" || lowerPkg == "com.android.settings") {
-                return true
-            }
-            if (lowerLabel == "maps" || lowerPkg.contains("maps")) {
-                return true
-            }
-            if (lowerLabel == "calendar" || lowerPkg.contains("calendar")) {
-                return true
-            }
+            // 1. Phone / Dialer
+            if (lowerLabel == "phone" || lowerLabel == "dialer" ||
+                lowerPkg.contains("dialer") || lowerPkg.contains("incallui") ||
+                lowerPkg == "com.android.phone"
+            ) return true
 
-            // Distracting managed apps are strictly NOT essential
+            // 2. Messages / SMS
+            if (lowerLabel == "messages" || lowerLabel == "sms" || lowerLabel == "messenger" ||
+                lowerPkg.contains("messaging") || lowerPkg.contains(".mms") ||
+                lowerPkg == "com.google.android.apps.messaging"
+            ) return true
+
+            // 3. Camera
+            if (lowerLabel == "camera" ||
+                lowerPkg.contains("camera") && !lowerPkg.contains("camerax")
+            ) return true
+
+            // 4. Clock / Alarm
+            if (lowerLabel == "clock" || lowerLabel == "alarm" ||
+                lowerPkg.contains("deskclock") || lowerPkg.contains("clock")
+            ) return true
+
+            // 5. Contacts
+            if (lowerLabel == "contacts" || lowerLabel == "people" ||
+                lowerPkg.contains("contacts") && !lowerPkg.contains("contactscommon")
+            ) return true
+
+            // 6. Calendar
+            if (lowerLabel == "calendar" ||
+                lowerPkg.contains("calendar")
+            ) return true
+
+            // Explicitly NOT essential — distracting apps
             if (lowerPkg.contains("youtube") || lowerPkg.contains("instagram") ||
                 lowerPkg.contains("tiktok") || lowerPkg.contains("twitter") ||
                 lowerPkg.contains("reddit") || lowerPkg.contains("netflix") ||
                 lowerPkg.contains("facebook") || lowerPkg.contains("snapchat") ||
                 lowerPkg.contains("game")
-            ) {
-                return false
-            }
+            ) return false
 
             return false
         }
