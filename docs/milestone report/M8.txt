@@ -1,0 +1,52 @@
+================================================================================
+                     MINIMAL PHONE — MILESTONE 8 REPORT
+================================================================================
+Milestone: M8 — Bypass Protection & Accessibility Service Backstop
+Status:    COMPLETED & VERIFIED
+Timestamp: 2026-09-17
+
+1. OBJECTIVES & DELIVERABLES ACHIEVED
+--------------------------------------------------------------------------------
+- Domain Bypass Evaluation Engine (`core:domain:bypass`):
+  * `EvaluateBypassRouteUseCase`:
+    - Evaluates incoming foreground package changes against active focus session rules.
+    - Excludes Minimal Phone itself and essential Android System UI/Framework components (`android`, `com.android.systemui`, `com.android.settings`, system keyboards).
+    - Always allows essential / always-available applications (Dialer, SMS, Clock, Camera, Settings, Maps).
+    - Allows managed applications when no focus session is active or when session is in `LIGHT` mode.
+    - Triggers `BypassDecision.InterceptAndRedirect` for managed applications when an active session is in `STRICT` or `DEEP_FOCUS` mode.
+  * `RecordBypassAttemptUseCase`:
+    - Logs intercepted bypass attempts to `BlockedAttemptRepository` with the detected route (`NOTIFICATION`, `RECENTS`, `DEEP_LINK`, `EXTERNAL_INTENT`).
+    - Automatically increments the bypass attempt counter on the active `FocusSession`.
+
+- Accessibility Service Backstop (`app:service`):
+  * `MinimalAccessibilityService`:
+    - Real Android `AccessibilityService` registered with `BIND_ACCESSIBILITY_SERVICE`.
+    - Privacy-first configuration in `@xml/accessibility_service_config`:
+      * Listens strictly to `TYPE_WINDOW_STATE_CHANGED`.
+      * `canRetrieveWindowContent="false"` (zero keystrokes, zero screen content reading).
+    - Aggressive performance optimizations: debounces rapid window state switches (<350ms) to eliminate CPU spikes and infinite redirect loops.
+    - On unauthorized bypass detection, immediately redirects the user back to Minimal Phone home screen via `performGlobalAction(GLOBAL_ACTION_HOME)` or explicit clear-top launcher Intent.
+
+- System & Helper Integrations (`core:common` & `app:res`):
+  * `AccessibilityHelper`: Checks `Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES` and provides direct intent navigation to `Settings.ACTION_ACCESSIBILITY_SETTINGS`.
+  * Updated `strings.xml` with clear, transparent privacy and permission explanation.
+  * Manifest declaration linking the service to the security and event filter definitions.
+
+2. FILES CREATED / MODIFIED
+--------------------------------------------------------------------------------
+- Domain:
+  * `core/domain/src/main/java/com/minimalphone/core/domain/bypass/BypassEngine.kt`
+  * `core/domain/src/test/java/com/minimalphone/core/domain/bypass/BypassEngineTest.kt`
+- Common Utilities:
+  * `core/common/src/main/java/com/minimalphone/core/common/AccessibilityHelper.kt`
+- App & Service:
+  * `app/src/main/java/com/minimalphone/service/MinimalAccessibilityService.kt`
+  * `app/src/main/res/xml/accessibility_service_config.xml`
+  * `app/src/main/res/values/strings.xml`
+  * `app/src/main/AndroidManifest.xml`
+
+3. TEST & BUILD VERIFICATION
+--------------------------------------------------------------------------------
+- JVM Unit Tests: 100% passing across `:core:domain` for `EvaluateBypassRouteUseCase` and `RecordBypassAttemptUseCase`.
+- Android Debug APK Build: `./gradlew assembleDebug` SUCCESSFUL.
+================================================================================

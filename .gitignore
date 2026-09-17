@@ -1,0 +1,70 @@
+# ==============================================================================
+# Minimal Phone — Comprehensive .gitignore
+# ==============================================================================
+
+# Built application files
+*.apk
+*.aar
+*.ap_
+*.aab
+*.dex
+
+# Files for the ART/JVM
+*.class
+
+# Java / JVM crash & heap dumps
+hs_err_pid*
+replay_pid*
+*.hprof
+
+# Generated build directories
+build/
+*/build/
+.gradle/
+.cxx/
+.kotlin/
+
+# Android Studio / IntelliJ IDEA & VSCode
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+out/
+.navigation/
+captures/
+
+# Sensitive Credentials, Keystores & Secrets
+local.properties
+secrets.properties
+signing.properties
+google-services.json
+firebase.json
+*.keystore
+*.jks
+*.p12
+*.key
+*.pem
+*.pkcs12
+
+# Environment variables & token files
+.env
+.env.*
+api-keys.json
+credentials.json
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# Profiling & Diagnostics caches
+*.trace
+*.log
+.system_generated/
+scratch/

@@ -1,0 +1,22 @@
+MILESTONE: Milestone 4 — UsageStats & Screen Time
+STATUS: SUCCESSFUL
+IMPLEMENTED:
+  - Usage tracking data models in :core:model:
+    - AppUsageStat (tracks per-app foreground durations, last used time, categories, formatted display).
+    - DailyUsageSummary (aggregates today's total screen time, managed vs essential split ratio, and sorted app stats).
+  - DefaultUsageStatsRepository in :core:data:
+    - Integrates UsageStatsManager (INTERVAL_DAILY start-of-day query).
+    - Permission checks via AppOpsManager (PACKAGE_USAGE_STATS).
+    - Automatically links discovered Room app categories to calculate exact managed vs essential time proportions.
+    - Excludes Minimal Phone launcher itself to prevent self-measurement inflation.
+  - Domain UseCases in :core:domain:
+    - GetDailyUsageStatsUseCase & CheckUsagePermissionUseCase.
+  - Screen Time Dashboard in :feature:screentime:
+    - ScreenTimeViewModel & ScreenTimeScreen featuring typography-focused today's screen time, managed vs essential split indicator, per-app breakdown, and a one-tap Permission Required guide to Settings.
+    - Connected into MinimalPhoneNavHost.
+  - Test suite in :feature:screentime validating duration formatting and usage summary calculations.
+TESTED:
+  - ./gradlew.bat test (BUILD SUCCESSFUL - all unit tests passed)
+  - ./gradlew.bat assembleDebug (BUILD SUCCESSFUL - debug APK generated)
+KNOWN ISSUES: None.
+NEXT STEP: Milestone 5 — Central App Launch Engine (Domain decision pipeline: EvaluateAppLaunchUseCase, LaunchAppUseCase emitting ALLOW / BLOCK / SHOW_FRICTION without Accessibility dependencies).

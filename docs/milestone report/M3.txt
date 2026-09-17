@@ -1,0 +1,23 @@
+MILESTONE: Milestone 3 — App Classification, Rules & Room Persistence Foundation
+STATUS: SUCCESSFUL
+IMPLEMENTED:
+  - Room Database (MinimalPhoneDatabase) with TypeConverters, versioning, and Hilt DatabaseModule.
+  - Entities & DAOs for all core domain tables:
+    - InstalledAppEntity & InstalledAppDao (stores discovered apps with live reactive flows).
+    - AppRuleEntity & AppRuleDao (preserves user-defined overrides for Always Available vs Managed across rescans).
+    - FocusSessionEntity & FocusSessionDao (tracks focus session lifecycle and goals).
+    - BlockedAttemptEntity & BlockedAttemptDao (logs blocked attempts locally).
+    - ExitAttemptEntity & ExitAttemptDao (logs adaptive friction metrics).
+    - FocusGoalEntity (tracks custom and preset focus session targets).
+  - DefaultAppRepository Room Integration:
+    - Automatically syncs scanned apps into Room and merges them with user-defined AppRule overrides.
+    - Exposes distinctUntilChanged Room Flow streams for home apps, essential apps, and managed apps.
+  - App Management UI in :feature:appslist:
+    - AppsManagementViewModel & AppsManagementScreen for managing installed apps in settings (search, filter by All/Essential/Managed, category toggles, home screen favorite pins).
+    - Connected into MinimalPhoneNavHost.
+  - Unit tests in :core:data and :feature:appslist testing AppScanner classification and AppsManagementViewModel search & filtering logic.
+TESTED:
+  - ./gradlew.bat test (BUILD SUCCESSFUL - all unit tests passed)
+  - ./gradlew.bat assembleDebug (BUILD SUCCESSFUL - debug APK generated)
+KNOWN ISSUES: None.
+NEXT STEP: Milestone 4 — UsageStats & Screen Time (UsageStatsManager integration, daily foreground app usage metrics, category breakdown, permission flow).

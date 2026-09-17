@@ -1,0 +1,62 @@
+================================================================================
+                     MINIMAL PHONE — MILESTONE 7 REPORT
+================================================================================
+Milestone: M7 — Exit Friction & Focus Goals
+Status:    COMPLETED & VERIFIED
+Timestamp: 2026-09-17
+
+1. OBJECTIVES & DELIVERABLES ACHIEVED
+--------------------------------------------------------------------------------
+- Adaptive Exit Friction Domain Engine (`core:domain:friction`):
+  * `CalculateExitFrictionUseCase`: Implements exact exponential progression:
+    - Attempt 1 (0 prior) -> 5 seconds
+    - Attempt 2 (1 prior) -> 30 seconds
+    - Attempt 3 (2 prior) -> 120 seconds (2 minutes)
+    - Attempt 4+ (3+ prior) -> 600 seconds (10 minutes)
+  * `PrepareExitAttemptUseCase`: Calculates current attempt sequence, remaining session minutes, and required friction delay.
+  * `CompleteExitAttemptUseCase`: Unlocks and cancels session when friction delay is completed, logging successful exit to `ExitAttemptRepository`.
+  * `AbortExitAttemptUseCase`: Increments bypass attempt counter and logs aborted exit attempt when the user chooses to continue focusing.
+  * `RecordIntentReflectionUseCase`: Records "Why are you opening this?" survey choices (Important/Urgent, Just checking, I'm bored, Someone sent me something, Other) to `BlockedAttemptRepository`.
+
+- Exit Friction UI & Dialog (`core:ui:components`):
+  * `ExitFrictionDialog`:
+    - Shows original intention card: *"Your Goal: [Goal Title]"* with remaining time.
+    - Displays progressive attempt badge: *"EXIT ATTEMPT #[N]"*.
+    - Non-shaming, mindful message: *"You chose a focus session. Take a moment before leaving."*
+    - Live countdown timer with *"Wait [X] seconds"* lock.
+    - Disabled *"WAITING (Xs)"* button until countdown finishes, then transforms into an active *"EXIT ANYWAY"* button.
+    - High-contrast *"CONTINUE FOCUS"* button to easily resume.
+  * `IntentReflectionDialog`:
+    - Clean monochrome modal for intentional reflection.
+    - Radio choices for intent reason + custom reason input field.
+
+- Feature Integrations (`feature:focussession` & `feature:homescreen`):
+  * `FocusSessionViewModel` & `FocusSessionScreen`: Intercepts "LEAVE FOCUS SESSION" taps during `STRICT` and `DEEP_FOCUS` modes to trigger `ExitFrictionDialog`.
+  * `HomeViewModel` & `HomeScreen`: Triggers `IntentReflectionDialog` during Light mode launches or inspection of restricted apps, logging user intent to Room.
+
+2. FILES CREATED / MODIFIED
+--------------------------------------------------------------------------------
+- Domain:
+  * `core/domain/src/main/java/com/minimalphone/core/domain/friction/ExitFrictionEngine.kt`
+  * `core/domain/src/test/java/com/minimalphone/core/domain/friction/ExitFrictionEngineTest.kt`
+- Models & Contracts:
+  * `core/model/src/main/java/com/minimalphone/core/model/DomainContracts.kt`
+- UI & Dialogs:
+  * `core/ui/src/main/java/com/minimalphone/core/ui/components/ExitFrictionDialog.kt`
+  * `core/ui/src/main/java/com/minimalphone/core/ui/components/IntentReflectionDialog.kt`
+  * `feature/focussession/src/main/java/com/minimalphone/feature/focussession/FocusSessionViewModel.kt`
+  * `feature/focussession/src/main/java/com/minimalphone/feature/focussession/FocusSessionScreen.kt`
+  * `feature/focussession/src/test/java/com/minimalphone/feature/focussession/FocusSessionViewModelTest.kt`
+  * `feature/homescreen/src/main/java/com/minimalphone/feature/homescreen/HomeViewModel.kt`
+  * `feature/homescreen/src/main/java/com/minimalphone/feature/homescreen/HomeScreen.kt`
+  * `feature/homescreen/src/test/java/com/minimalphone/feature/homescreen/HomeViewModelTest.kt`
+- Data & Repositories:
+  * `core/data/src/main/java/com/minimalphone/core/data/db/dao/Daos.kt`
+  * `core/data/src/main/java/com/minimalphone/core/data/repository/Repositories.kt`
+  * `core/data/src/main/java/com/minimalphone/core/data/repository/SessionRepositories.kt`
+
+3. TEST & BUILD VERIFICATION
+--------------------------------------------------------------------------------
+- JVM Unit Tests: 100% passing across `:core:domain`, `:core:data`, `:feature:focussession`, `:feature:homescreen`, `:feature:screentime`, `:feature:appslist`.
+- Android Debug APK Build: `./gradlew assembleDebug` SUCCESSFUL.
+================================================================================

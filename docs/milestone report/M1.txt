@@ -1,0 +1,17 @@
+MILESTONE: Milestone 1 — Launcher Shell
+STATUS: SUCCESSFUL
+IMPLEMENTED:
+  - HOME Activity manifest registration (ACTION_MAIN, CATEGORY_HOME, CATEGORY_DEFAULT, singleTask, clearTaskOnLaunch).
+  - Minimal Compose UI:
+    - MinimalClockHeader (live updating time & date formatted calmly).
+    - MinimalAppItemRow (high-contrast typography item rows with subtle touch feedback).
+    - FocusStatusIndicator (in-place focus state summary and touch target for focus session setup).
+    - HomeScreen with clean edge-to-edge layout on pure black background.
+  - AppLauncher helper handling real Android Intents (Dialer, Messages, System Settings, Default Launcher configuration, and package-specific launch intents).
+  - Back press suppression on the home screen to prevent accidental launcher process exits.
+  - Unit tests for HomeViewModel verifying essential apps state.
+TESTED:
+  - ./gradlew.bat test (BUILD SUCCESSFUL - unit tests passed)
+  - ./gradlew.bat assembleDebug (BUILD SUCCESSFUL - debug APK generated)
+KNOWN ISSUES: None.
+NEXT STEP: Milestone 2 — Dynamic App Discovery & Lifecycle (LauncherApps.registerCallback(), package install/update/uninstall reactive pipeline into AppRepository Flow).

@@ -1,0 +1,14 @@
+MILESTONE: Milestone 0 — Project Foundation
+STATUS: SUCCESSFUL
+IMPLEMENTED:
+  - Multi-module Gradle Kotlin DSL architecture with Version Catalog (libs.versions.toml) targeting Android SDK 34, JDK 21 toolchain, Kotlin 2.0.20, Compose BOM, Room 2.6.1, and Hilt 2.51.1.
+  - Complete module graph: :app, :core:model, :core:common, :core:data, :core:domain, :core:ui, :feature:homescreen, :feature:appslist, :feature:focussession, :feature:screentime, :feature:onboarding, :feature:settings.
+  - Core domain models & contracts: InstalledApp, AppCategory, AppRule, FocusSession, FocusGoal, BlockedAttempt, ExitAttempt, AppLaunchDecision, BypassRoute, BypassDecision.
+  - Full documentation suite in docs/ (prd.md, architecture.md, permissions.md, testing.md, risks.md).
+  - Clean theme (MinimalTheme) & typography definitions (MinimalTypography).
+  - Main navigation graph scaffold (MinimalPhoneNavHost) and Application entry point (MinimalPhoneApplication).
+TESTED:
+  - ./gradlew.bat assembleDebug (BUILD SUCCESSFUL - debug APK generated)
+  - ./gradlew.bat test (BUILD SUCCESSFUL across all 12 modules)
+KNOWN ISSUES: None.
+NEXT STEP: Milestone 1 — Launcher Shell (HOME Activity intent filters, real Android Intent app launching, minimal home screen Compose UI).

@@ -1,0 +1,44 @@
+================================================================================
+                     MINIMAL PHONE — MILESTONE 5 REPORT
+================================================================================
+Milestone: M5 — Central App Launch Interception & Blocking Engine
+Status:    COMPLETED & VERIFIED
+Timestamp: 2026-09-17
+
+1. OBJECTIVES & DELIVERABLES ACHIEVED
+--------------------------------------------------------------------------------
+- Centralized Launch Decision Engine:
+  * Implemented pure-domain evaluation in `com.minimalphone.core.domain.launch.EvaluateAppLaunchUseCase`
+  * Rule 1: Always Available (Essential) apps are never blocked under any state or mode.
+  * Rule 2: Inactive focus session allows launching of any managed app.
+  * Rule 3: Active focus session in STRICT or DEEP_FOCUS mode returns `AppLaunchDecision.Block`.
+  * Rule 4: Active focus session in LIGHT mode returns `AppLaunchDecision.ShowFriction` with countdown.
+- Launch Interception & Blocked Attempt Logging:
+  * `LaunchAppUseCase` intercepts package launch intent, queries `EvaluateAppLaunchUseCase`, and records `BlockedAttempt` in Room when blocked.
+  * `DefaultBlockedAttemptRepository` records attempts with timestamp, app label, route ("LAUNCHER"), and active focusSessionId.
+- Blocked Attempt UI & Dialog:
+  * Created `BlockedAppDialog` in `core:ui` styled with pure monochrome design (`MinimalTheme`).
+  * Displays active focus goal (e.g., "DBMS Revision"), custom blocking message, and an "Understood" dismiss action.
+- Home Screen Integration:
+  * Updated `HomeViewModel` to trigger `LaunchAppUseCase` on app selection.
+  * Connected `HomeScreen` to display `BlockedAppDialog` on `AppLaunchDecision.Block` or trigger intent launch on `AppLaunchDecision.Allow`.
+
+2. FILES CREATED / MODIFIED
+--------------------------------------------------------------------------------
+- Domain:
+  * `core/domain/src/main/java/com/minimalphone/core/domain/launch/LaunchEngine.kt`
+  * `core/domain/src/test/java/com/minimalphone/core/domain/launch/LaunchEngineTest.kt`
+- UI & Dialogs:
+  * `core/ui/src/main/java/com/minimalphone/core/ui/BlockedAppDialog.kt`
+  * `feature/homescreen/src/main/java/com/minimalphone/feature/homescreen/HomeViewModel.kt`
+  * `feature/homescreen/src/main/java/com/minimalphone/feature/homescreen/HomeScreen.kt`
+  * `feature/homescreen/src/test/java/com/minimalphone/feature/homescreen/HomeViewModelTest.kt`
+- Repositories & Entities:
+  * `core/data/src/main/java/com/minimalphone/core/data/repository/DefaultBlockedAttemptRepository.kt`
+  * `core/data/src/main/java/com/minimalphone/core/data/repository/DefaultFocusSessionRepository.kt`
+
+3. TEST & BUILD VERIFICATION
+--------------------------------------------------------------------------------
+- JVM Unit Tests: 100% passing across `:core:domain`, `:core:data`, `:feature:homescreen`, `:feature:appslist`, `:feature:screentime`.
+- Android Debug APK Build: `./gradlew assembleDebug` SUCCESSFUL.
+================================================================================

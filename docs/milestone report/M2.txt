@@ -1,0 +1,18 @@
+MILESTONE: Milestone 2 — Dynamic App Discovery & Lifecycle
+STATUS: SUCCESSFUL
+IMPLEMENTED:
+  - AppScanner in :core:data:
+    - Scans real launchable activities across multi-user/work profiles using LauncherApps.getActivityList() and UserManager.userProfiles.
+    - Fallback querying via PackageManager.queryIntentActivities().
+    - Dynamic essential tool detection (Dialer, SMS/Messages, Camera, Settings, Clock, Contacts, Maps) vs managed apps (YouTube, Instagram, TikTok, Reddit, Games, etc.).
+  - DefaultAppRepository & LauncherApps.Callback lifecycle pipeline:
+    - Automatically captures onPackageAdded(), onPackageRemoved(), onPackageChanged(), onPackagesAvailable(), and onPackagesUnavailable().
+    - Emits reactive StateFlow<List<InstalledApp>> for instant UI updates when apps are installed or uninstalled.
+  - Domain UseCases: GetInstalledAppsUseCase, GetHomeAppsUseCase, SyncInstalledAppsUseCase, UpdateAppCategoryUseCase.
+  - Updated HomeViewModel to dynamically collect from GetHomeAppsUseCase instead of static placeholders.
+  - Complete test suite in :core:data and :feature:homescreen validating app scanning, classification rules, and repository emissions.
+TESTED:
+  - ./gradlew.bat test (BUILD SUCCESSFUL - all unit tests passed)
+  - ./gradlew.bat assembleDebug (BUILD SUCCESSFUL - debug APK generated)
+KNOWN ISSUES: None.
+NEXT STEP: Milestone 3 — App Classification, Rules & Room Persistence Foundation (Room Entities, DAOs, Database Migrations, Persistent AppRules, and Settings App Management UI in feature:appslist).

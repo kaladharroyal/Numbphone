@@ -1,0 +1,60 @@
+================================================================================
+                     MINIMAL PHONE — MILESTONE 9 REPORT
+================================================================================
+Milestone: M9 — Boot + OEM Resilience & System Diagnostics
+Status:    COMPLETED & VERIFIED
+Timestamp: 2026-09-17
+
+1. OBJECTIVES & DELIVERABLES ACHIEVED
+--------------------------------------------------------------------------------
+- Boot Recovery & State Restoration Engine (`core:domain:boot` & `app:receiver`):
+  * `RestoreFocusOnBootUseCase`:
+    - Safely handles device reboot and system package updates offline.
+    - Synchronizes installed launchable applications to capture changes made while off.
+    - If active focus session is unexpired: maintains session active state, re-aligning ticker timelines with real-time clock.
+    - If active session expired during shutdown: automatically marks the session as `COMPLETED` in database.
+  * `MinimalBootReceiver`:
+    - Registered for `ACTION_BOOT_COMPLETED`, `LOCKED_BOOT_COMPLETED`, and `MY_PACKAGE_REPLACED`.
+    - Asynchronously executes `RestoreFocusOnBootUseCase` with `goAsync()` on `Dispatchers.IO`.
+
+- OEM Battery & Background Survival Engine (`core:common`):
+  * `SystemHealthHelper`:
+    - Queries `RoleManager` / `PackageManager` to detect default launcher status.
+    - Checks battery optimization exemption via `PowerManager.isIgnoringBatteryOptimizations()`.
+    - Intent factories targeting direct system settings for default home and battery whitelist.
+    - Contextual OEM guidance for aggressive Android vendors (Samsung OneUI, Xiaomi HyperOS/MIUI, OPPO/Realme ColorOS, OnePlus OxygenOS, Huawei EMUI).
+
+- Real-Time System Health & Diagnostics UI (`feature:settings` & `app`):
+  * `DiagnosticsViewModel`:
+    - Collects reactive Flow combining database state, platform permissions, and hardware telemetry.
+  * `DiagnosticsScreen`:
+    - Pure monochrome dashboard displaying live health checks:
+      * Default Launcher status (Active / Set as Default)
+      * Accessibility Backstop (Active / Enable Service)
+      * Usage Stats access (Granted / Grant Access)
+      * Battery Unrestricted (Unrestricted / Exempt Battery)
+      * OEM Background Survival advice card
+      * Active Focus Session state telemetry
+      * Hardware & Android OS info
+  * Connected into `MinimalPhoneNavHost` under `Screen.Diagnostics` and `Screen.Settings`.
+
+2. FILES CREATED / MODIFIED
+--------------------------------------------------------------------------------
+- Domain:
+  * `core/domain/src/main/java/com/minimalphone/core/domain/boot/BootRecoveryEngine.kt`
+  * `core/domain/src/test/java/com/minimalphone/core/domain/boot/BootRecoveryEngineTest.kt`
+- Common Utilities:
+  * `core/common/src/main/java/com/minimalphone/core/common/SystemHealthHelper.kt`
+- App & Receivers:
+  * `app/src/main/java/com/minimalphone/receiver/MinimalBootReceiver.kt`
+  * `app/src/main/AndroidManifest.xml`
+  * `app/src/main/java/com/minimalphone/MinimalPhoneNavHost.kt`
+- Settings & Diagnostics Feature:
+  * `feature/settings/src/main/java/com/minimalphone/feature/settings/DiagnosticsViewModel.kt`
+  * `feature/settings/src/main/java/com/minimalphone/feature/settings/DiagnosticsScreen.kt`
+
+3. TEST & BUILD VERIFICATION
+--------------------------------------------------------------------------------
+- JVM Unit Tests: 100% passing across `:core:domain` for `RestoreFocusOnBootUseCase` and `ObserveSystemDiagnosticsUseCase`.
+- Android Debug APK Build: `./gradlew assembleDebug` SUCCESSFUL.
+================================================================================
