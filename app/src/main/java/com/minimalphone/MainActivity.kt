@@ -1,18 +1,25 @@
 package com.minimalphone
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Surface
-import androidx.compose.ui.Modifier
-import com.minimalphone.core.ui.theme.MinimalTheme
-import com.minimalphone.core.ui.theme.PureBlack
+import com.minimalphone.core.domain.timelimit.TimeLimitExpiryNotifier
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var timeLimitExpiryNotifier: TimeLimitExpiryNotifier
+
+    companion object {
+        const val ACTION_TIME_LIMIT_EXPIRED = "com.minimalphone.action.TIME_LIMIT_EXPIRED"
+        const val EXTRA_EXPIRED_PACKAGE = "extra_expired_package"
+        const val EXTRA_EXPIRED_APP_LABEL = "extra_expired_app_label"
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -29,8 +36,26 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+        handleExpiredIntent(intent)
+
         setContent {
             MinimalPhoneNavHost()
         }
     }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleExpiredIntent(intent)
+    }
+
+    private fun handleExpiredIntent(intent: Intent?) {
+        if (intent == null) return
+        val expiredPackage = intent.getStringExtra(EXTRA_EXPIRED_PACKAGE)
+        if (!expiredPackage.isNullOrBlank()) {
+            val appLabel = intent.getStringExtra(EXTRA_EXPIRED_APP_LABEL) ?: expiredPackage.substringAfterLast('.')
+            timeLimitExpiryNotifier.notifyTimeLimitExpired(expiredPackage, appLabel)
+        }
+    }
 }
+

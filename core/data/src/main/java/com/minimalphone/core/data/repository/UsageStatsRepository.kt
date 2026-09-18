@@ -23,6 +23,7 @@ import javax.inject.Singleton
 interface UsageStatsRepository {
     fun getDailyUsageSummary(): Flow<DailyUsageSummary>
     suspend fun hasUsagePermission(): Boolean
+    suspend fun getTodayUsageMinutes(packageName: String): Long
 }
 
 @Singleton
@@ -33,6 +34,30 @@ class DefaultUsageStatsRepository @Inject constructor(
 
     private val usageStatsManager: UsageStatsManager? =
         context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
+
+    override suspend fun getTodayUsageMinutes(packageName: String): Long = withContext(Dispatchers.IO) {
+        if (!hasUsagePermission() || usageStatsManager == null) return@withContext 0L
+        try {
+            val calendar = Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            val statsList: List<UsageStats> = usageStatsManager.queryUsageStats(
+                UsageStatsManager.INTERVAL_DAILY,
+                calendar.timeInMillis,
+                System.currentTimeMillis()
+            ) ?: emptyList()
+
+            val totalMillis = statsList
+                .filter { it.packageName == packageName }
+                .sumOf { it.totalTimeInForeground }
+            totalMillis / (1000 * 60)
+        } catch (_: Exception) {
+            0L
+        }
+    }
 
     override suspend fun hasUsagePermission(): Boolean = withContext(Dispatchers.IO) {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as? AppOpsManager ?: return@withContext false

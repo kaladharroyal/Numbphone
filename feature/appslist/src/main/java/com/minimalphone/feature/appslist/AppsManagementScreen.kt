@@ -42,10 +42,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.icons.outlined.HourglassBottom
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.minimalphone.core.model.AppCategory
+import com.minimalphone.core.model.AppTimeLimit
 import com.minimalphone.core.model.InstalledApp
+import com.minimalphone.core.ui.components.SetTimeLimitDialog
 import com.minimalphone.core.ui.theme.DarkSurface
 import com.minimalphone.core.ui.theme.MutedText
 import com.minimalphone.core.ui.theme.PureBlack
@@ -57,6 +63,19 @@ fun AppsManagementScreen(
     viewModel: AppsManagementViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var selectedAppForLimit by remember { mutableStateOf<InstalledApp?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var isAccessibilityEnabled by remember {
+        mutableStateOf(
+            try {
+                @Suppress("UNCHECKED_CAST")
+                val serviceClass = Class.forName("com.minimalphone.service.MinimalAccessibilityService") as Class<out android.accessibilityservice.AccessibilityService>
+                com.minimalphone.core.common.AccessibilityHelper.isAccessibilityServiceEnabled(context, serviceClass)
+            } catch (_: Exception) {
+                false
+            }
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -97,6 +116,48 @@ fun AppsManagementScreen(
                         tint = MutedText
                     )
                 }
+            }
+
+            // Accessibility Permission Banner if not enabled
+            if (!isAccessibilityEnabled) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .background(Color(0xFF332000), RoundedCornerShape(12.dp))
+                        .border(1.dp, Color(0xFFFF9F0A).copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                        .clickable {
+                            context.startActivity(com.minimalphone.core.common.AccessibilityHelper.createAccessibilitySettingsIntent())
+                        }
+                        .padding(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "⚠️ Protection Service Inactive",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                                color = Color(0xFFFFD60A)
+                            )
+                            Text(
+                                text = "Enable Accessibility Service to allow auto-closing apps when daily limits expire.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.85f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "ENABLE",
+                            color = Color(0xFFFFD60A),
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
             }
 
             // Search Bar
@@ -209,8 +270,11 @@ fun AppsManagementScreen(
                     ) { app ->
                         AppManagementRow(
                             app = app,
+                            timeLimit = uiState.limitsMap[app.packageName],
+                            todayUsedMinutes = uiState.usageMinutesMap[app.packageName] ?: 0L,
                             onToggleCategory = { viewModel.toggleAppCategory(app) },
-                            onToggleFavorite = { viewModel.toggleFavoriteOnHome(app) }
+                            onToggleFavorite = { viewModel.toggleFavoriteOnHome(app) },
+                            onConfigureLimit = { selectedAppForLimit = app }
                         )
                     }
 
@@ -255,14 +319,37 @@ fun AppsManagementScreen(
                 }
             }
         }
+
+        // Daily Time Limit Configuration Dialog
+        if (selectedAppForLimit != null) {
+            val targetApp = selectedAppForLimit!!
+            val currentLimit = uiState.limitsMap[targetApp.packageName]?.dailyLimitMinutes
+            val todayUsage = uiState.usageMinutesMap[targetApp.packageName] ?: 0L
+
+            SetTimeLimitDialog(
+                appLabel = targetApp.label,
+                currentLimitMinutes = currentLimit,
+                todayUsedMinutes = todayUsage,
+                onDismiss = { selectedAppForLimit = null },
+                onSaveLimit = { limitMinutes ->
+                    viewModel.setAppTimeLimit(targetApp.packageName, limitMinutes)
+                },
+                onRemoveLimit = {
+                    viewModel.removeAppTimeLimit(targetApp.packageName)
+                }
+            )
+        }
     }
 }
 
 @Composable
 fun AppManagementRow(
     app: InstalledApp,
+    timeLimit: AppTimeLimit? = null,
+    todayUsedMinutes: Long = 0L,
     onToggleCategory: () -> Unit,
     onToggleFavorite: () -> Unit,
+    onConfigureLimit: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isEssential = app.category == AppCategory.ESSENTIAL
@@ -282,16 +369,29 @@ fun AppManagementRow(
                 style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp),
                 color = MaterialTheme.colorScheme.onBackground
             )
+            
+            val statusSubtitle = if (isEssential) "Always Available (Essential)" else "Managed (Blocked in focus)"
+            val limitSubtitle = if (timeLimit != null) " • ⏳ Limit: ${timeLimit.formattedLimit} (${todayUsedMinutes}m used)" else ""
+            
             Text(
-                text = if (isEssential) "Always Available (Essential)" else "Managed (Blocked during focus)",
+                text = statusSubtitle + limitSubtitle,
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
-                color = if (isEssential) Color(0xFF32D74B) else MutedText
+                color = if (timeLimit != null) Color(0xFFFF9F0A) else if (isEssential) Color(0xFF32D74B) else MutedText
             )
         }
 
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Daily Time Limit Button
+            IconButton(onClick = onConfigureLimit) {
+                Icon(
+                    imageVector = Icons.Outlined.HourglassBottom,
+                    contentDescription = "Set daily limit",
+                    tint = if (timeLimit != null) Color(0xFFFF9F0A) else MutedText
+                )
+            }
+
             // Home Favorite Pin
             IconButton(onClick = onToggleFavorite) {
                 Icon(

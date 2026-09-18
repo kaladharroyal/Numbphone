@@ -3,7 +3,12 @@ package com.minimalphone.feature.appslist
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.minimalphone.core.data.repository.AppRepository
+import com.minimalphone.core.data.repository.UsageStatsRepository
+import com.minimalphone.core.domain.GetAppTimeLimitsUseCase
+import com.minimalphone.core.domain.RemoveAppTimeLimitUseCase
+import com.minimalphone.core.domain.SetAppTimeLimitUseCase
 import com.minimalphone.core.model.AppCategory
+import com.minimalphone.core.model.AppTimeLimit
 import com.minimalphone.core.model.InstalledApp
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,12 +31,18 @@ data class AppsManagementUiState(
     val apps: List<InstalledApp> = emptyList(),
     val totalAppsCount: Int = 0,
     val essentialCount: Int = 0,
-    val managedCount: Int = 0
+    val managedCount: Int = 0,
+    val limitsMap: Map<String, AppTimeLimit> = emptyMap(),
+    val usageMinutesMap: Map<String, Long> = emptyMap()
 )
 
 @HiltViewModel
 class AppsManagementViewModel @Inject constructor(
-    private val appRepository: AppRepository
+    private val appRepository: AppRepository,
+    private val getAppTimeLimitsUseCase: GetAppTimeLimitsUseCase,
+    private val setAppTimeLimitUseCase: SetAppTimeLimitUseCase,
+    private val removeAppTimeLimitUseCase: RemoveAppTimeLimitUseCase,
+    private val usageStatsRepository: UsageStatsRepository
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -40,8 +51,10 @@ class AppsManagementViewModel @Inject constructor(
     val uiState: StateFlow<AppsManagementUiState> = combine(
         appRepository.getAllApps(),
         _searchQuery,
-        _activeFilter
-    ) { allApps, query, filter ->
+        _activeFilter,
+        getAppTimeLimitsUseCase(),
+        usageStatsRepository.getDailyUsageSummary()
+    ) { allApps, query, filter, limits, usageSummary ->
         val filtered = allApps.filter { app ->
             val matchesQuery = query.isBlank() ||
                     app.label.contains(query, ignoreCase = true) ||
@@ -56,13 +69,18 @@ class AppsManagementViewModel @Inject constructor(
             matchesQuery && matchesFilter
         }
 
+        val limitsMap = limits.associateBy { it.packageName }
+        val usageMap = usageSummary.appStats.associate { it.packageName to it.totalMinutes }
+
         AppsManagementUiState(
             searchQuery = query,
             activeFilter = filter,
             apps = filtered,
             totalAppsCount = allApps.size,
             essentialCount = allApps.count { it.category == AppCategory.ESSENTIAL },
-            managedCount = allApps.count { it.category == AppCategory.MANAGED }
+            managedCount = allApps.count { it.category == AppCategory.MANAGED },
+            limitsMap = limitsMap,
+            usageMinutesMap = usageMap
         )
     }.stateIn(
         scope = viewModelScope,
@@ -92,6 +110,18 @@ class AppsManagementViewModel @Inject constructor(
     fun toggleFavoriteOnHome(app: InstalledApp) {
         viewModelScope.launch {
             appRepository.toggleFavoriteOnHome(app.packageName, !app.isFavoriteOnHome)
+        }
+    }
+
+    fun setAppTimeLimit(packageName: String, limitMinutes: Int) {
+        viewModelScope.launch {
+            setAppTimeLimitUseCase(packageName, limitMinutes)
+        }
+    }
+
+    fun removeAppTimeLimit(packageName: String) {
+        viewModelScope.launch {
+            removeAppTimeLimitUseCase(packageName)
         }
     }
 

@@ -42,7 +42,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.outlined.HourglassBottom
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.minimalphone.core.model.AppTimeLimit
 import com.minimalphone.core.model.AppUsageStat
+import com.minimalphone.core.ui.components.SetTimeLimitDialog
 import com.minimalphone.core.ui.theme.DarkSurface
 import com.minimalphone.core.ui.theme.MutedText
 import com.minimalphone.core.ui.theme.PureBlack
@@ -54,6 +61,7 @@ fun ScreenTimeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var selectedAppStat by remember { mutableStateOf<AppUsageStat?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.loadStats()
@@ -173,10 +181,33 @@ fun ScreenTimeScreen(
                         items = uiState.summary.appStats,
                         key = { it.packageName }
                     ) { appStat ->
-                        AppUsageRow(appStat = appStat)
+                        AppUsageRow(
+                            appStat = appStat,
+                            timeLimit = uiState.limitsMap[appStat.packageName],
+                            onSetLimitClick = { selectedAppStat = appStat }
+                        )
                     }
                 }
             }
+        }
+
+        // Daily Time Limit Dialog
+        if (selectedAppStat != null) {
+            val stat = selectedAppStat!!
+            val currentLimit = uiState.limitsMap[stat.packageName]?.dailyLimitMinutes
+
+            SetTimeLimitDialog(
+                appLabel = stat.label,
+                currentLimitMinutes = currentLimit,
+                todayUsedMinutes = stat.totalMinutes,
+                onDismiss = { selectedAppStat = null },
+                onSaveLimit = { limitMinutes ->
+                    viewModel.setAppTimeLimit(stat.packageName, limitMinutes)
+                },
+                onRemoveLimit = {
+                    viewModel.removeAppTimeLimit(stat.packageName)
+                }
+            )
         }
     }
 }
@@ -184,11 +215,16 @@ fun ScreenTimeScreen(
 @Composable
 fun AppUsageRow(
     appStat: AppUsageStat,
+    timeLimit: AppTimeLimit? = null,
+    onSetLimitClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isLimitExceeded = timeLimit != null && timeLimit.isEnabled && appStat.totalMinutes >= timeLimit.dailyLimitMinutes
+
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .clickable(onClick = onSetLimitClick)
             .padding(horizontal = 24.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -199,21 +235,39 @@ fun AppUsageRow(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
+            
+            val statusSubtitle = if (appStat.isEssential) "Essential" else "Managed"
+            val limitSubtitle = when {
+                isLimitExceeded -> " • 🚫 Limit Reached (${timeLimit!!.formattedLimit})"
+                timeLimit != null -> " • ⏳ Limit: ${timeLimit.formattedLimit}"
+                else -> ""
+            }
+
             Text(
-                text = if (appStat.isEssential) "Essential" else "Managed",
+                text = statusSubtitle + limitSubtitle,
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
-                color = if (appStat.isEssential) Color(0xFF32D74B) else MutedText
+                color = if (isLimitExceeded) Color(0xFFFF453A) else if (timeLimit != null) Color(0xFFFF9F0A) else if (appStat.isEssential) Color(0xFF32D74B) else MutedText
             )
         }
 
-        Text(
-            text = appStat.formattedDuration,
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Medium
-            ),
-            color = MaterialTheme.colorScheme.onBackground
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = appStat.formattedDuration,
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium
+                ),
+                color = if (isLimitExceeded) Color(0xFFFF453A) else MaterialTheme.colorScheme.onBackground
+            )
+
+            IconButton(onClick = onSetLimitClick) {
+                Icon(
+                    imageVector = Icons.Outlined.HourglassBottom,
+                    contentDescription = "Set Limit",
+                    tint = if (isLimitExceeded) Color(0xFFFF453A) else if (timeLimit != null) Color(0xFFFF9F0A) else MutedText
+                )
+            }
+        }
     }
 }
 

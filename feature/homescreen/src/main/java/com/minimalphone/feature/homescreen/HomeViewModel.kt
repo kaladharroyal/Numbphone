@@ -3,6 +3,7 @@ package com.minimalphone.feature.homescreen
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.minimalphone.core.data.repository.FocusSessionRepository
+import com.minimalphone.core.domain.ExtendAppTimeLimitUseCase
 import com.minimalphone.core.domain.GetHomeAppsUseCase
 import com.minimalphone.core.domain.SyncInstalledAppsUseCase
 import com.minimalphone.core.domain.friction.RecordIntentReflectionUseCase
@@ -12,6 +13,7 @@ import com.minimalphone.core.model.AppLaunchDecision
 import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSession
 import com.minimalphone.core.model.InstalledApp
+import com.minimalphone.core.domain.timelimit.TimeLimitExpiryNotifier
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +27,12 @@ data class BlockedDialogState(
     val packageName: String = "",
     val reason: String = "",
     val activeSession: FocusSession? = null
+)
+
+data class TimeLimitExpiredDialogState(
+    val isShowing: Boolean = false,
+    val packageName: String = "",
+    val appLabel: String = ""
 )
 
 data class ReflectionDialogState(
@@ -43,6 +51,7 @@ data class HomeUiState(
     val isDefaultLauncher: Boolean = false,
     val isLoading: Boolean = true,
     val blockedDialog: BlockedDialogState = BlockedDialogState(),
+    val timeLimitExpiredDialog: TimeLimitExpiredDialogState = TimeLimitExpiredDialogState(),
     val reflectionDialog: ReflectionDialogState = ReflectionDialogState()
 )
 
@@ -52,7 +61,9 @@ class HomeViewModel @Inject constructor(
     private val syncInstalledAppsUseCase: SyncInstalledAppsUseCase,
     private val launchAppUseCase: LaunchAppUseCase,
     private val focusSessionRepository: FocusSessionRepository,
-    private val recordIntentReflectionUseCase: RecordIntentReflectionUseCase
+    private val recordIntentReflectionUseCase: RecordIntentReflectionUseCase,
+    private val extendAppTimeLimitUseCase: ExtendAppTimeLimitUseCase,
+    private val timeLimitExpiryNotifier: TimeLimitExpiryNotifier
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -60,7 +71,24 @@ class HomeViewModel @Inject constructor(
 
     init {
         observeState()
+        observeTimeLimitExpiryEvents()
         refreshApps()
+    }
+
+    private fun observeTimeLimitExpiryEvents() {
+        viewModelScope.launch {
+            timeLimitExpiryNotifier.currentExpiredEvent.collect { event ->
+                if (event != null) {
+                    _uiState.value = _uiState.value.copy(
+                        timeLimitExpiredDialog = TimeLimitExpiredDialogState(
+                            isShowing = true,
+                            packageName = event.packageName,
+                            appLabel = event.appLabel
+                        )
+                    )
+                }
+            }
+        }
     }
 
     private fun observeState() {
@@ -104,14 +132,25 @@ class HomeViewModel @Inject constructor(
                     onAllowLaunch(decision.packageName, decision.activityName)
                 }
                 is AppLaunchDecision.Block -> {
-                    _uiState.value = _uiState.value.copy(
-                        blockedDialog = BlockedDialogState(
-                            isShowing = true,
-                            packageName = decision.packageName,
-                            reason = decision.reason,
-                            activeSession = decision.activeSession
+                    if (decision.reason.contains("Daily limit", ignoreCase = true)) {
+                        timeLimitExpiryNotifier.notifyTimeLimitExpired(app.packageName, app.label)
+                        _uiState.value = _uiState.value.copy(
+                            timeLimitExpiredDialog = TimeLimitExpiredDialogState(
+                                isShowing = true,
+                                packageName = app.packageName,
+                                appLabel = app.label
+                            )
                         )
-                    )
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            blockedDialog = BlockedDialogState(
+                                isShowing = true,
+                                packageName = decision.packageName,
+                                reason = decision.reason,
+                                activeSession = decision.activeSession
+                            )
+                        )
+                    }
                 }
                 is AppLaunchDecision.ShowFriction -> {
                     _uiState.value = _uiState.value.copy(
@@ -125,6 +164,23 @@ class HomeViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun extendEmergencyTime(packageName: String, additionalMinutes: Int) {
+        viewModelScope.launch {
+            extendAppTimeLimitUseCase(packageName, additionalMinutes)
+            timeLimitExpiryNotifier.clearExpiredEvent()
+            _uiState.value = _uiState.value.copy(
+                timeLimitExpiredDialog = TimeLimitExpiredDialogState(isShowing = false)
+            )
+        }
+    }
+
+    fun dismissTimeLimitExpiredDialog() {
+        timeLimitExpiryNotifier.clearExpiredEvent()
+        _uiState.value = _uiState.value.copy(
+            timeLimitExpiredDialog = TimeLimitExpiredDialogState(isShowing = false)
+        )
     }
 
     fun onRecordReflection(reason: String) {

@@ -1,8 +1,10 @@
 package com.minimalphone.core.domain.launch
 
 import com.minimalphone.core.data.repository.AppRepository
+import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.BlockedAttemptRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
+import com.minimalphone.core.data.repository.UsageStatsRepository
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.AppLaunchDecision
 import com.minimalphone.core.model.BlockedAttempt
@@ -11,7 +13,9 @@ import javax.inject.Inject
 
 class EvaluateAppLaunchUseCase @Inject constructor(
     private val appRepository: AppRepository,
-    private val focusSessionRepository: FocusSessionRepository
+    private val focusSessionRepository: FocusSessionRepository,
+    private val appTimeLimitRepository: AppTimeLimitRepository,
+    private val usageStatsRepository: UsageStatsRepository
 ) {
     suspend operator fun invoke(packageName: String): AppLaunchDecision {
         val app = appRepository.getApp(packageName)
@@ -21,7 +25,21 @@ class EvaluateAppLaunchUseCase @Inject constructor(
                 activeSession = null
             )
 
-        // Rule 1: Always Available (Essential) apps are never blocked
+        // Rule 1: Check Per-App Daily Time Limits (Applies to all managed and configured apps)
+        val timeLimit = appTimeLimitRepository.getLimit(packageName)
+        if (timeLimit != null && timeLimit.isEnabled && timeLimit.effectiveDailyLimitMinutes > 0) {
+            val usedMinutes = usageStatsRepository.getTodayUsageMinutes(packageName)
+            if (usedMinutes >= timeLimit.effectiveDailyLimitMinutes) {
+                val limitStr = timeLimit.formattedEffectiveLimit
+                return AppLaunchDecision.Block(
+                    packageName = app.packageName,
+                    reason = "Daily limit of $limitStr reached for today (${usedMinutes}m used).",
+                    activeSession = null
+                )
+            }
+        }
+
+        // Rule 2: Always Available (Essential) apps are never blocked by Focus Sessions
         if (app.category == AppCategory.ESSENTIAL || app.isEssential) {
             return AppLaunchDecision.Allow(
                 packageName = app.packageName,
@@ -29,7 +47,7 @@ class EvaluateAppLaunchUseCase @Inject constructor(
             )
         }
 
-        // Rule 2: Check if Focus Session is currently active
+        // Rule 3: Check if Focus Session is currently active
         val activeSession = focusSessionRepository.getActiveSessionSync()
         if (activeSession == null || !activeSession.isCurrentlyActive) {
             return AppLaunchDecision.Allow(

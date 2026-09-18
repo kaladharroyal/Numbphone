@@ -36,7 +36,7 @@ object DndHelper {
                 MinimalLog.w(TAG, "Notification policy access not granted; unable to set DND")
                 false
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             MinimalLog.e(TAG, "Failed to set DND interruption filter", e)
             false
         }
@@ -52,7 +52,7 @@ object DndHelper {
             } else {
                 false
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             MinimalLog.e(TAG, "Failed to restore notification filter", e)
             false
         }

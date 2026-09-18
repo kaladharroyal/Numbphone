@@ -48,3 +48,31 @@ data class DailyUsageSummary(
     val managedPercentage: Float
         get() = if (totalScreenTimeMillis > 0) (managedTimeMillis.toFloat() / totalScreenTimeMillis) else 0f
 }
+
+data class AppTimeLimit(
+    val packageName: String,
+    val dailyLimitMinutes: Int,
+    val isEnabled: Boolean = true,
+    val updatedTimestamp: Long = System.currentTimeMillis(),
+    val emergencyExtensionMinutes: Int = 0,
+    val lastExtensionDateMillis: Long = 0L
+) {
+    val effectiveDailyLimitMinutes: Int
+        get() = dailyLimitMinutes + emergencyExtensionMinutes
+
+    val formattedLimit: String
+        get() = formatMinutes(dailyLimitMinutes)
+
+    val formattedEffectiveLimit: String
+        get() = formatMinutes(effectiveDailyLimitMinutes)
+
+    private fun formatMinutes(totalMins: Int): String {
+        val hours = totalMins / 60
+        val minutes = totalMins % 60
+        return when {
+            hours > 0 && minutes > 0 -> "${hours}h ${minutes}m"
+            hours > 0 -> "${hours}h"
+            else -> "${minutes}m"
+        }
+    }
+}

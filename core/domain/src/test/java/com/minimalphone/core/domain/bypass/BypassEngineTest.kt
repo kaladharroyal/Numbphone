@@ -1,12 +1,16 @@
 package com.minimalphone.core.domain.bypass
 
 import com.minimalphone.core.data.repository.AppRepository
+import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.BlockedAttemptRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
+import com.minimalphone.core.data.repository.UsageStatsRepository
 import com.minimalphone.core.model.AppCategory
+import com.minimalphone.core.model.AppTimeLimit
 import com.minimalphone.core.model.BlockedAttempt
 import com.minimalphone.core.model.BypassDecision
 import com.minimalphone.core.model.BypassRoute
+import com.minimalphone.core.model.DailyUsageSummary
 import com.minimalphone.core.model.FocusGoal
 import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSession
@@ -14,6 +18,7 @@ import com.minimalphone.core.model.InstalledApp
 import com.minimalphone.core.model.SessionStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -67,11 +72,48 @@ class FakeBypassBlockedAttemptRepository : BlockedAttemptRepository {
     }
 }
 
+class FakeBypassTimeLimitRepository : AppTimeLimitRepository {
+    private val limits = mutableMapOf<String, AppTimeLimit>()
+    private val flow = MutableStateFlow<List<AppTimeLimit>>(emptyList())
+
+    fun setLimitSync(limit: AppTimeLimit) {
+        limits[limit.packageName] = limit
+        flow.value = limits.values.toList()
+    }
+
+    override fun observeAllLimits(): Flow<List<AppTimeLimit>> = flow.asStateFlow()
+    override suspend fun getLimit(packageName: String): AppTimeLimit? = limits[packageName]
+    override fun observeLimit(packageName: String): Flow<AppTimeLimit?> = MutableStateFlow(limits[packageName])
+    override suspend fun setLimit(packageName: String, limitMinutes: Int, isEnabled: Boolean) {
+        limits[packageName] = AppTimeLimit(packageName, limitMinutes, isEnabled)
+        flow.value = limits.values.toList()
+    }
+    override suspend fun addEmergencyExtension(packageName: String, additionalMinutes: Int) {
+        val cur = limits[packageName] ?: AppTimeLimit(packageName, 0)
+        limits[packageName] = cur.copy(emergencyExtensionMinutes = cur.emergencyExtensionMinutes + additionalMinutes)
+        flow.value = limits.values.toList()
+    }
+    override suspend fun removeLimit(packageName: String) {
+        limits.remove(packageName)
+        flow.value = limits.values.toList()
+    }
+}
+
+class FakeBypassUsageStatsRepository : UsageStatsRepository {
+    val usageMap = mutableMapOf<String, Long>()
+
+    override fun getDailyUsageSummary(): Flow<DailyUsageSummary> = MutableStateFlow(DailyUsageSummary())
+    override suspend fun hasUsagePermission(): Boolean = true
+    override suspend fun getTodayUsageMinutes(packageName: String): Long = usageMap[packageName] ?: 0L
+}
+
 class BypassEngineTest {
 
     private lateinit var appRepository: FakeBypassAppRepository
     private lateinit var focusSessionRepository: FakeBypassFocusSessionRepository
     private lateinit var blockedAttemptRepository: FakeBypassBlockedAttemptRepository
+    private lateinit var appTimeLimitRepository: FakeBypassTimeLimitRepository
+    private lateinit var usageStatsRepository: FakeBypassUsageStatsRepository
     private lateinit var evaluateBypassRouteUseCase: EvaluateBypassRouteUseCase
     private lateinit var recordBypassAttemptUseCase: RecordBypassAttemptUseCase
 
@@ -80,8 +122,15 @@ class BypassEngineTest {
         appRepository = FakeBypassAppRepository()
         focusSessionRepository = FakeBypassFocusSessionRepository()
         blockedAttemptRepository = FakeBypassBlockedAttemptRepository()
+        appTimeLimitRepository = FakeBypassTimeLimitRepository()
+        usageStatsRepository = FakeBypassUsageStatsRepository()
 
-        evaluateBypassRouteUseCase = EvaluateBypassRouteUseCase(appRepository, focusSessionRepository)
+        evaluateBypassRouteUseCase = EvaluateBypassRouteUseCase(
+            appRepository,
+            focusSessionRepository,
+            appTimeLimitRepository,
+            usageStatsRepository
+        )
         recordBypassAttemptUseCase = RecordBypassAttemptUseCase(
             appRepository = appRepository,
             blockedAttemptRepository = blockedAttemptRepository,
@@ -224,5 +273,40 @@ class BypassEngineTest {
         assertEquals("NOTIFICATION", attempt.route)
         assertEquals("sess_bypass_test", attempt.focusSessionId)
         assertEquals(1, focusSessionRepository.bypassCount)
+    }
+
+    @Test
+    fun evaluateBypass_interceptsWhenDailyLimitExceededEvenWithNoActiveSession() = runTest {
+        focusSessionRepository.activeSession = null
+        appTimeLimitRepository.setLimitSync(
+            AppTimeLimit(
+                packageName = "com.instagram.android",
+                dailyLimitMinutes = 30,
+                isEnabled = true
+            )
+        )
+        usageStatsRepository.usageMap["com.instagram.android"] = 35L
+
+        val decision = evaluateBypassRouteUseCase("com.instagram.android")
+        assertTrue(decision is BypassDecision.InterceptAndRedirect)
+        val intercept = decision as BypassDecision.InterceptAndRedirect
+        assertEquals("com.instagram.android", intercept.packageName)
+        assertEquals("Daily Limit Reached", intercept.session.goal.title)
+    }
+
+    @Test
+    fun evaluateBypass_allowsWhenDailyLimitNotExceeded() = runTest {
+        focusSessionRepository.activeSession = null
+        appTimeLimitRepository.setLimitSync(
+            AppTimeLimit(
+                packageName = "com.instagram.android",
+                dailyLimitMinutes = 60,
+                isEnabled = true
+            )
+        )
+        usageStatsRepository.usageMap["com.instagram.android"] = 25L
+
+        val decision = evaluateBypassRouteUseCase("com.instagram.android")
+        assertEquals(BypassDecision.Allow, decision)
     }
 }
