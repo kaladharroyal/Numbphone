@@ -1,20 +1,27 @@
 package com.minimalphone.core.domain.bypass
 
 import com.minimalphone.core.data.repository.AppRepository
+import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.BlockedAttemptRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
 import com.minimalphone.core.domain.emergency.EmergencyAccessManager
+import com.minimalphone.core.data.repository.UsageStatsRepository
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.BlockedAttempt
 import com.minimalphone.core.model.BypassDecision
 import com.minimalphone.core.model.BypassRoute
+import com.minimalphone.core.model.FocusGoal
 import com.minimalphone.core.model.FocusMode
+import com.minimalphone.core.model.FocusSession
+import com.minimalphone.core.model.SessionStatus
 import javax.inject.Inject
 
 class EvaluateBypassRouteUseCase @Inject constructor(
     private val appRepository: AppRepository,
     private val focusSessionRepository: FocusSessionRepository,
-    private val emergencyAccessManager: EmergencyAccessManager
+    private val emergencyAccessManager: EmergencyAccessManager,
+    private val appTimeLimitRepository: AppTimeLimitRepository,
+    private val usageStatsRepository: UsageStatsRepository
 ) {
     suspend operator fun invoke(packageName: String): BypassDecision {
         // 1. Ignore Minimal Phone launcher itself
@@ -32,7 +39,29 @@ class EvaluateBypassRouteUseCase @Inject constructor(
             return BypassDecision.Allow
         }
 
-        // 4. Query app metadata — DB-classified essential apps also bypass
+        // 4. Check Per-App Daily Time Limits (Checked first before Focus session logic)
+        val timeLimit = appTimeLimitRepository.getLimit(packageName)
+        if (timeLimit != null && timeLimit.isEnabled && timeLimit.effectiveDailyLimitMinutes > 0) {
+            val usedMinutes = usageStatsRepository.getTodayUsageMinutes(packageName)
+            if (usedMinutes >= timeLimit.effectiveDailyLimitMinutes) {
+                val activeSession = focusSessionRepository.getActiveSessionSync()
+                val sessionToUse = activeSession ?: FocusSession(
+                    id = "limit_$packageName",
+                    startTime = System.currentTimeMillis(),
+                    endTime = System.currentTimeMillis() + 60000,
+                    durationMinutes = timeLimit.effectiveDailyLimitMinutes,
+                    goal = FocusGoal("limit", "Daily Limit Reached", "Budget"),
+                    mode = FocusMode.STRICT,
+                    status = SessionStatus.ACTIVE
+                )
+                return BypassDecision.InterceptAndRedirect(
+                    packageName = packageName,
+                    session = sessionToUse
+                )
+            }
+        }
+
+        // 5. Query app metadata: Essential apps bypass Focus Sessions
         val app = appRepository.getApp(packageName)
         if (app != null && (app.category == AppCategory.ESSENTIAL || app.isEssential)) {
             return BypassDecision.Allow

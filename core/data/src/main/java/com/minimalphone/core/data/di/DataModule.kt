@@ -3,6 +3,8 @@ package com.minimalphone.core.data.di
 import com.minimalphone.core.data.repository.AppRepository
 import com.minimalphone.core.data.repository.BlockedAttemptRepository
 import com.minimalphone.core.data.repository.DefaultAppRepository
+import com.minimalphone.core.data.repository.AppTimeLimitRepository
+import com.minimalphone.core.data.repository.DefaultAppTimeLimitRepository
 import com.minimalphone.core.data.repository.DefaultBlockedAttemptRepository
 import com.minimalphone.core.data.repository.DefaultEssentialAppRepository
 import com.minimalphone.core.data.repository.DefaultExitAttemptRepository
@@ -29,6 +31,12 @@ object DataModule {
     fun provideAppRepository(
         impl: DefaultAppRepository
     ): AppRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideAppTimeLimitRepository(
+        impl: DefaultAppTimeLimitRepository
+    ): AppTimeLimitRepository = impl
 
     @Provides
     @Singleton

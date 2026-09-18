@@ -1,11 +1,15 @@
 package com.minimalphone.core.domain.launch
 
 import com.minimalphone.core.data.repository.AppRepository
+import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.BlockedAttemptRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
+import com.minimalphone.core.data.repository.UsageStatsRepository
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.AppLaunchDecision
+import com.minimalphone.core.model.AppTimeLimit
 import com.minimalphone.core.model.BlockedAttempt
+import com.minimalphone.core.model.DailyUsageSummary
 import com.minimalphone.core.model.FocusGoal
 import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSession
@@ -94,6 +98,41 @@ class FakeBlockedAttemptRepository : BlockedAttemptRepository {
     }
 }
 
+class FakeLaunchTimeLimitRepository : AppTimeLimitRepository {
+    private val limits = mutableMapOf<String, AppTimeLimit>()
+    private val flow = MutableStateFlow<List<AppTimeLimit>>(emptyList())
+
+    fun setLimitSync(limit: AppTimeLimit) {
+        limits[limit.packageName] = limit
+        flow.value = limits.values.toList()
+    }
+
+    override fun observeAllLimits(): Flow<List<AppTimeLimit>> = flow.asStateFlow()
+    override suspend fun getLimit(packageName: String): AppTimeLimit? = limits[packageName]
+    override fun observeLimit(packageName: String): Flow<AppTimeLimit?> = MutableStateFlow(limits[packageName])
+    override suspend fun setLimit(packageName: String, limitMinutes: Int, isEnabled: Boolean) {
+        limits[packageName] = AppTimeLimit(packageName, limitMinutes, isEnabled)
+        flow.value = limits.values.toList()
+    }
+    override suspend fun addEmergencyExtension(packageName: String, additionalMinutes: Int) {
+        val cur = limits[packageName] ?: AppTimeLimit(packageName, 0)
+        limits[packageName] = cur.copy(emergencyExtensionMinutes = cur.emergencyExtensionMinutes + additionalMinutes)
+        flow.value = limits.values.toList()
+    }
+    override suspend fun removeLimit(packageName: String) {
+        limits.remove(packageName)
+        flow.value = limits.values.toList()
+    }
+}
+
+class FakeLaunchUsageStatsRepository : UsageStatsRepository {
+    val usageMap = mutableMapOf<String, Long>()
+
+    override fun getDailyUsageSummary(): Flow<DailyUsageSummary> = MutableStateFlow(DailyUsageSummary())
+    override suspend fun hasUsagePermission(): Boolean = true
+    override suspend fun getTodayUsageMinutes(packageName: String): Long = usageMap[packageName] ?: 0L
+}
+
 class LaunchEngineTest {
 
     private lateinit var appRepository: FakeLaunchAppRepository
@@ -101,6 +140,8 @@ class LaunchEngineTest {
     private lateinit var blockedAttemptRepository: FakeBlockedAttemptRepository
     private lateinit var emergencyAccessManager: EmergencyAccessManager
     private lateinit var ruleEngine: RuleEngine
+    private lateinit var appTimeLimitRepository: FakeLaunchTimeLimitRepository
+    private lateinit var usageStatsRepository: FakeLaunchUsageStatsRepository
     private lateinit var evaluateAppLaunchUseCase: EvaluateAppLaunchUseCase
     private lateinit var launchAppUseCase: LaunchAppUseCase
 
@@ -115,7 +156,17 @@ class LaunchEngineTest {
         val budgetRepo = mockk<BudgetRepository>(relaxed = true)
         val settingsRepo = mockk<SettingsRepository>(relaxed = true)
         ruleEngine = RuleEngine(budgetRepo, settingsRepo)
-        evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(appRepository, focusSessionRepository, emergencyAccessManager, ruleEngine)
+        appTimeLimitRepository = FakeLaunchTimeLimitRepository()
+        usageStatsRepository = FakeLaunchUsageStatsRepository()
+
+        evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(
+            appRepository = appRepository,
+            focusSessionRepository = focusSessionRepository,
+            emergencyAccessManager = emergencyAccessManager,
+            ruleEngine = ruleEngine,
+            appTimeLimitRepository = appTimeLimitRepository,
+            usageStatsRepository = usageStatsRepository
+        )
         launchAppUseCase = LaunchAppUseCase(evaluateAppLaunchUseCase, appRepository, blockedAttemptRepository)
     }
 
@@ -180,5 +231,54 @@ class LaunchEngineTest {
 
         val decision = launchAppUseCase("com.google.android.youtube")
         assertTrue(decision is AppLaunchDecision.ShowFriction)
+    }
+
+    @Test
+    fun `managed app is allowed when daily usage is under time limit`() = runBlocking {
+        appTimeLimitRepository.setLimitSync(AppTimeLimit("com.google.android.youtube", dailyLimitMinutes = 60, isEnabled = true))
+        usageStatsRepository.usageMap["com.google.android.youtube"] = 45L
+
+        val decision = launchAppUseCase("com.google.android.youtube")
+        assertTrue(decision is AppLaunchDecision.Allow)
+    }
+
+    @Test
+    fun `managed app is blocked when daily usage reaches or exceeds time limit`() = runBlocking {
+        appTimeLimitRepository.setLimitSync(AppTimeLimit("com.google.android.youtube", dailyLimitMinutes = 60, isEnabled = true))
+        usageStatsRepository.usageMap["com.google.android.youtube"] = 65L
+
+        val decision = launchAppUseCase("com.google.android.youtube")
+        assertTrue(decision is AppLaunchDecision.Block)
+        val block = decision as AppLaunchDecision.Block
+        assertTrue(block.reason.contains("Daily limit"))
+        assertEquals(1, blockedAttemptRepository.recordedAttempts.size)
+    }
+
+    @Test
+    fun `essential app with explicit time limit is blocked when limit exceeded`() = runBlocking {
+        appTimeLimitRepository.setLimitSync(AppTimeLimit("com.google.android.dialer", dailyLimitMinutes = 30, isEnabled = true))
+        usageStatsRepository.usageMap["com.google.android.dialer"] = 50L
+
+        val decision = launchAppUseCase("com.google.android.dialer")
+        assertTrue(decision is AppLaunchDecision.Block)
+        val block = decision as AppLaunchDecision.Block
+        assertTrue(block.reason.contains("Daily limit"))
+    }
+
+    @Test
+    fun `managed app is allowed after adding emergency extension when over initial daily limit`() = runBlocking {
+        appTimeLimitRepository.setLimitSync(
+            AppTimeLimit(
+                packageName = "com.google.android.youtube",
+                dailyLimitMinutes = 60,
+                emergencyExtensionMinutes = 15,
+                isEnabled = true
+            )
+        )
+        // 65 min used is > 60 min, but <= 75 min effective limit
+        usageStatsRepository.usageMap["com.google.android.youtube"] = 65L
+
+        val decision = launchAppUseCase("com.google.android.youtube")
+        assertTrue(decision is AppLaunchDecision.Allow)
     }
 }

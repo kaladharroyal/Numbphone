@@ -6,6 +6,7 @@ import androidx.room.TypeConverters
 import com.minimalphone.core.data.db.converters.MinimalConverters
 import com.minimalphone.core.data.db.dao.AppBudgetDao
 import com.minimalphone.core.data.db.dao.AppRuleDao
+import com.minimalphone.core.data.db.dao.AppTimeLimitDao
 import com.minimalphone.core.data.db.dao.BlockedAttemptDao
 import com.minimalphone.core.data.db.dao.DailyAppUsageDao
 import com.minimalphone.core.data.db.dao.DigestNotificationDao
@@ -18,6 +19,7 @@ import com.minimalphone.core.data.db.dao.InstalledAppDao
 import com.minimalphone.core.data.db.dao.QuickContactDao
 import com.minimalphone.core.data.db.entity.AppBudgetEntity
 import com.minimalphone.core.data.db.entity.AppRuleEntity
+import com.minimalphone.core.data.db.entity.AppTimeLimitEntity
 import com.minimalphone.core.data.db.entity.BlockedAttemptEntity
 import com.minimalphone.core.data.db.entity.DailyAppUsageEntity
 import com.minimalphone.core.data.db.entity.DigestNotificationEntity
@@ -44,9 +46,10 @@ import com.minimalphone.core.data.db.entity.QuickContactEntity
         FocusPresetEntity::class,
         FocusScheduleEntity::class,
         DigestNotificationEntity::class,
-        QuickContactEntity::class
+        QuickContactEntity::class,
+        AppTimeLimitEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(MinimalConverters::class)
@@ -63,6 +66,7 @@ abstract class MinimalPhoneDatabase : RoomDatabase() {
     abstract fun focusScheduleDao(): FocusScheduleDao
     abstract fun digestNotificationDao(): DigestNotificationDao
     abstract fun quickContactDao(): QuickContactDao
+    abstract fun appTimeLimitDao(): AppTimeLimitDao
 
     companion object {
         const val DATABASE_NAME = "minimal_phone.db"

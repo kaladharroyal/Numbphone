@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import com.minimalphone.core.data.db.entity.AppRuleEntity
+import com.minimalphone.core.data.db.entity.AppTimeLimitEntity
 import com.minimalphone.core.data.db.entity.BlockedAttemptEntity
 import com.minimalphone.core.data.db.entity.EssentialAppEntity
 import com.minimalphone.core.data.db.entity.ExitAttemptEntity
@@ -273,7 +274,27 @@ interface QuickContactDao {
     suspend fun delete(id: String)
 }
 
+@Dao
+interface AppTimeLimitDao {
 
+    @Query("SELECT * FROM app_time_limits ORDER BY updatedTimestamp DESC")
+    fun observeAllLimits(): Flow<List<AppTimeLimitEntity>>
 
+    @Query("SELECT * FROM app_time_limits WHERE packageName = :packageName LIMIT 1")
+    suspend fun getLimit(packageName: String): AppTimeLimitEntity?
 
+    @Query("SELECT * FROM app_time_limits WHERE packageName = :packageName LIMIT 1")
+    fun observeLimit(packageName: String): Flow<AppTimeLimitEntity?>
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertLimit(limit: AppTimeLimitEntity)
+
+    @Query("UPDATE app_time_limits SET emergencyExtensionMinutes = emergencyExtensionMinutes + :additionalMinutes, lastExtensionDateMillis = :dateMillis WHERE packageName = :packageName")
+    suspend fun addEmergencyExtension(packageName: String, additionalMinutes: Int, dateMillis: Long)
+
+    @Query("UPDATE app_time_limits SET emergencyExtensionMinutes = 0 WHERE lastExtensionDateMillis < :startOfDayMillis")
+    suspend fun resetExtensionsOlderThan(startOfDayMillis: Long)
+
+    @Query("DELETE FROM app_time_limits WHERE packageName = :packageName")
+    suspend fun deleteLimit(packageName: String)
+}

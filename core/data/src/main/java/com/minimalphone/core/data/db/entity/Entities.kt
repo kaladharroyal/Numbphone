@@ -179,7 +179,12 @@ data class QuickContactEntity(
     val addedTimestamp: Long = System.currentTimeMillis()
 )
 
-
-
-
-
+@Entity(tableName = "app_time_limits")
+data class AppTimeLimitEntity(
+    @PrimaryKey val packageName: String,
+    val dailyLimitMinutes: Int,
+    val isEnabled: Boolean = true,
+    val updatedTimestamp: Long = System.currentTimeMillis(),
+    val emergencyExtensionMinutes: Int = 0,
+    val lastExtensionDateMillis: Long = 0L
+)

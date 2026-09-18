@@ -70,4 +70,7 @@ object DatabaseModule {
 
     @Provides
     fun provideQuickContactDao(db: MinimalPhoneDatabase): com.minimalphone.core.data.db.dao.QuickContactDao = db.quickContactDao()
+
+    @Provides
+    fun provideAppTimeLimitDao(db: MinimalPhoneDatabase): com.minimalphone.core.data.db.dao.AppTimeLimitDao = db.appTimeLimitDao()
 }

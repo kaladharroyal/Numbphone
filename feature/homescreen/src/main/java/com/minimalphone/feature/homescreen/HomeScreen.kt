@@ -61,6 +61,7 @@ import com.minimalphone.core.ui.components.FocusStatusIndicator
 import com.minimalphone.core.ui.components.IntentReflectionDialog
 import com.minimalphone.core.ui.components.MinimalAppItemRow
 import com.minimalphone.core.ui.components.MinimalClockHeader
+import com.minimalphone.core.ui.components.TimeLimitExpiredDialog
 import com.minimalphone.core.ui.theme.MutedText
 
 @Composable
@@ -309,6 +310,21 @@ fun HomeScreen(
                 session = uiState.blockedDialog.activeSession,
                 reason = uiState.blockedDialog.reason,
                 onDismiss = { viewModel.dismissBlockedDialog() }
+            )
+        }
+
+        // Daily Time Limit Expired Dialog (10-Second Countdown & Emergency Extension)
+        if (uiState.timeLimitExpiredDialog.isShowing) {
+            TimeLimitExpiredDialog(
+                appLabel = uiState.timeLimitExpiredDialog.appLabel,
+                packageName = uiState.timeLimitExpiredDialog.packageName,
+                onCloseApp = { viewModel.dismissTimeLimitExpiredDialog() },
+                onExtendEmergencyTime = { additionalMinutes ->
+                    viewModel.extendEmergencyTime(
+                        packageName = uiState.timeLimitExpiredDialog.packageName,
+                        additionalMinutes = additionalMinutes
+                    )
+                }
             )
         }
 
