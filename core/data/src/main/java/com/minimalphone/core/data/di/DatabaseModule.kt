@@ -46,4 +46,7 @@ object DatabaseModule {
 
     @Provides
     fun provideExitAttemptDao(db: MinimalPhoneDatabase): ExitAttemptDao = db.exitAttemptDao()
+
+    @Provides
+    fun provideAppTimeLimitDao(db: MinimalPhoneDatabase): com.minimalphone.core.data.db.dao.AppTimeLimitDao = db.appTimeLimitDao()
 }

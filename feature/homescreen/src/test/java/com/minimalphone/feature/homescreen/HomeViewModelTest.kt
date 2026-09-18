@@ -1,20 +1,26 @@
 package com.minimalphone.feature.homescreen
 
 import com.minimalphone.core.data.repository.AppRepository
+import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.BlockedAttemptRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
+import com.minimalphone.core.data.repository.UsageStatsRepository
+import com.minimalphone.core.domain.ExtendAppTimeLimitUseCase
 import com.minimalphone.core.domain.GetHomeAppsUseCase
 import com.minimalphone.core.domain.SyncInstalledAppsUseCase
 import com.minimalphone.core.domain.friction.RecordIntentReflectionUseCase
 import com.minimalphone.core.domain.launch.EvaluateAppLaunchUseCase
 import com.minimalphone.core.domain.launch.LaunchAppUseCase
 import com.minimalphone.core.model.AppCategory
+import com.minimalphone.core.model.AppTimeLimit
 import com.minimalphone.core.model.BlockedAttempt
+import com.minimalphone.core.model.DailyUsageSummary
 import com.minimalphone.core.model.FocusGoal
 import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSession
 import com.minimalphone.core.model.InstalledApp
 import com.minimalphone.core.model.SessionStatus
+import com.minimalphone.core.domain.timelimit.TimeLimitExpiryNotifier
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -86,11 +92,36 @@ class FakeHomeFocusSessionRepository : FocusSessionRepository {
 
 class FakeHomeBlockedAttemptRepository : BlockedAttemptRepository {
     val recorded = mutableListOf<BlockedAttempt>()
+
     override fun getBlockedAttempts(): Flow<List<BlockedAttempt>> = MutableStateFlow(recorded)
     override fun getTodayBlockedCount(): Flow<Int> = MutableStateFlow(recorded.size)
     override suspend fun recordBlockedAttempt(attempt: BlockedAttempt) {
         recorded.add(attempt)
     }
+}
+
+class FakeHomeTimeLimitRepository : AppTimeLimitRepository {
+    val limits = mutableMapOf<String, AppTimeLimit>()
+    override fun observeAllLimits(): Flow<List<AppTimeLimit>> = MutableStateFlow(limits.values.toList())
+    override suspend fun getLimit(packageName: String): AppTimeLimit? = limits[packageName]
+    override fun observeLimit(packageName: String): Flow<AppTimeLimit?> = MutableStateFlow(limits[packageName])
+    override suspend fun setLimit(packageName: String, limitMinutes: Int, isEnabled: Boolean) {
+        limits[packageName] = AppTimeLimit(packageName, limitMinutes, isEnabled)
+    }
+    override suspend fun addEmergencyExtension(packageName: String, additionalMinutes: Int) {
+        val cur = limits[packageName] ?: AppTimeLimit(packageName, 0)
+        limits[packageName] = cur.copy(emergencyExtensionMinutes = cur.emergencyExtensionMinutes + additionalMinutes)
+    }
+    override suspend fun removeLimit(packageName: String) {
+        limits.remove(packageName)
+    }
+}
+
+class FakeHomeUsageStatsRepository : UsageStatsRepository {
+    val usageMap = mutableMapOf<String, Long>()
+    override fun getDailyUsageSummary(): Flow<DailyUsageSummary> = MutableStateFlow(DailyUsageSummary())
+    override suspend fun hasUsagePermission(): Boolean = true
+    override suspend fun getTodayUsageMinutes(packageName: String): Long = usageMap[packageName] ?: 0L
 }
 
 class HomeViewModelTest {
@@ -103,19 +134,25 @@ class HomeViewModelTest {
         val fakeRepo = FakeHomeAppRepository()
         val fakeSessionRepo = FakeHomeFocusSessionRepository()
         val fakeBlockedRepo = FakeHomeBlockedAttemptRepository()
+        val fakeTimeLimitRepo = FakeHomeTimeLimitRepository()
+        val fakeUsageRepo = FakeHomeUsageStatsRepository()
 
         val getHomeAppsUseCase = GetHomeAppsUseCase(fakeRepo)
         val syncInstalledAppsUseCase = SyncInstalledAppsUseCase(fakeRepo)
-        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo)
+        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo, fakeTimeLimitRepo, fakeUsageRepo)
         val launchAppUseCase = LaunchAppUseCase(evaluateAppLaunchUseCase, fakeRepo, fakeBlockedRepo)
         val recordIntentReflectionUseCase = RecordIntentReflectionUseCase(fakeBlockedRepo)
+        val extendAppTimeLimitUseCase = ExtendAppTimeLimitUseCase(fakeTimeLimitRepo)
+        val timeLimitExpiryNotifier = TimeLimitExpiryNotifier()
 
         val viewModel = HomeViewModel(
             getHomeAppsUseCase,
             syncInstalledAppsUseCase,
             launchAppUseCase,
             fakeSessionRepo,
-            recordIntentReflectionUseCase
+            recordIntentReflectionUseCase,
+            extendAppTimeLimitUseCase,
+            timeLimitExpiryNotifier
         )
 
         val state = viewModel.uiState.value
@@ -129,6 +166,8 @@ class HomeViewModelTest {
         val fakeRepo = FakeHomeAppRepository()
         val fakeSessionRepo = FakeHomeFocusSessionRepository()
         val fakeBlockedRepo = FakeHomeBlockedAttemptRepository()
+        val fakeTimeLimitRepo = FakeHomeTimeLimitRepository()
+        val fakeUsageRepo = FakeHomeUsageStatsRepository()
 
         val activeSession = FocusSession(
             id = "sess-strict",
@@ -144,16 +183,20 @@ class HomeViewModelTest {
 
         val getHomeAppsUseCase = GetHomeAppsUseCase(fakeRepo)
         val syncInstalledAppsUseCase = SyncInstalledAppsUseCase(fakeRepo)
-        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo)
+        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo, fakeTimeLimitRepo, fakeUsageRepo)
         val launchAppUseCase = LaunchAppUseCase(evaluateAppLaunchUseCase, fakeRepo, fakeBlockedRepo)
         val recordIntentReflectionUseCase = RecordIntentReflectionUseCase(fakeBlockedRepo)
+        val extendAppTimeLimitUseCase = ExtendAppTimeLimitUseCase(fakeTimeLimitRepo)
+        val timeLimitExpiryNotifier = TimeLimitExpiryNotifier()
 
         val viewModel = HomeViewModel(
             getHomeAppsUseCase,
             syncInstalledAppsUseCase,
             launchAppUseCase,
             fakeSessionRepo,
-            recordIntentReflectionUseCase
+            recordIntentReflectionUseCase,
+            extendAppTimeLimitUseCase,
+            timeLimitExpiryNotifier
         )
 
         val state = viewModel.uiState.value
@@ -167,6 +210,8 @@ class HomeViewModelTest {
         val fakeRepo = FakeHomeAppRepository()
         val fakeSessionRepo = FakeHomeFocusSessionRepository()
         val fakeBlockedRepo = FakeHomeBlockedAttemptRepository()
+        val fakeTimeLimitRepo = FakeHomeTimeLimitRepository()
+        val fakeUsageRepo = FakeHomeUsageStatsRepository()
 
         val activeSession = FocusSession(
             id = "sess-1",
@@ -182,16 +227,20 @@ class HomeViewModelTest {
 
         val getHomeAppsUseCase = GetHomeAppsUseCase(fakeRepo)
         val syncInstalledAppsUseCase = SyncInstalledAppsUseCase(fakeRepo)
-        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo)
+        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo, fakeTimeLimitRepo, fakeUsageRepo)
         val launchAppUseCase = LaunchAppUseCase(evaluateAppLaunchUseCase, fakeRepo, fakeBlockedRepo)
         val recordIntentReflectionUseCase = RecordIntentReflectionUseCase(fakeBlockedRepo)
+        val extendAppTimeLimitUseCase = ExtendAppTimeLimitUseCase(fakeTimeLimitRepo)
+        val timeLimitExpiryNotifier = TimeLimitExpiryNotifier()
 
         val viewModel = HomeViewModel(
             getHomeAppsUseCase,
             syncInstalledAppsUseCase,
             launchAppUseCase,
             fakeSessionRepo,
-            recordIntentReflectionUseCase
+            recordIntentReflectionUseCase,
+            extendAppTimeLimitUseCase,
+            timeLimitExpiryNotifier
         )
 
         var didAllowLaunch = false
@@ -221,6 +270,8 @@ class HomeViewModelTest {
         val fakeRepo = FakeHomeAppRepository()
         val fakeSessionRepo = FakeHomeFocusSessionRepository()
         val fakeBlockedRepo = FakeHomeBlockedAttemptRepository()
+        val fakeTimeLimitRepo = FakeHomeTimeLimitRepository()
+        val fakeUsageRepo = FakeHomeUsageStatsRepository()
 
         val activeSession = FocusSession(
             id = "sess-light",
@@ -236,16 +287,20 @@ class HomeViewModelTest {
 
         val getHomeAppsUseCase = GetHomeAppsUseCase(fakeRepo)
         val syncInstalledAppsUseCase = SyncInstalledAppsUseCase(fakeRepo)
-        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo)
+        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo, fakeTimeLimitRepo, fakeUsageRepo)
         val launchAppUseCase = LaunchAppUseCase(evaluateAppLaunchUseCase, fakeRepo, fakeBlockedRepo)
         val recordIntentReflectionUseCase = RecordIntentReflectionUseCase(fakeBlockedRepo)
+        val extendAppTimeLimitUseCase = ExtendAppTimeLimitUseCase(fakeTimeLimitRepo)
+        val timeLimitExpiryNotifier = TimeLimitExpiryNotifier()
 
         val viewModel = HomeViewModel(
             getHomeAppsUseCase,
             syncInstalledAppsUseCase,
             launchAppUseCase,
             fakeSessionRepo,
-            recordIntentReflectionUseCase
+            recordIntentReflectionUseCase,
+            extendAppTimeLimitUseCase,
+            timeLimitExpiryNotifier
         )
 
         val youtube = InstalledApp(
@@ -268,4 +323,97 @@ class HomeViewModelTest {
         assertEquals(1, fakeBlockedRepo.recorded.size)
         assertEquals("Important / Urgent", fakeBlockedRepo.recorded.first().userIntentReason)
     }
+
+    @Test
+    fun `exceeded daily limit triggers timeLimitExpiredDialog and emergency extension updates limit`() {
+        val fakeRepo = FakeHomeAppRepository()
+        val fakeSessionRepo = FakeHomeFocusSessionRepository()
+        val fakeBlockedRepo = FakeHomeBlockedAttemptRepository()
+        val fakeTimeLimitRepo = FakeHomeTimeLimitRepository()
+        val fakeUsageRepo = FakeHomeUsageStatsRepository()
+
+        fakeTimeLimitRepo.limits["com.google.android.youtube"] = AppTimeLimit(
+            packageName = "com.google.android.youtube",
+            dailyLimitMinutes = 30,
+            isEnabled = true
+        )
+        fakeUsageRepo.usageMap["com.google.android.youtube"] = 45L // Over limit
+
+        val getHomeAppsUseCase = GetHomeAppsUseCase(fakeRepo)
+        val syncInstalledAppsUseCase = SyncInstalledAppsUseCase(fakeRepo)
+        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo, fakeTimeLimitRepo, fakeUsageRepo)
+        val launchAppUseCase = LaunchAppUseCase(evaluateAppLaunchUseCase, fakeRepo, fakeBlockedRepo)
+        val recordIntentReflectionUseCase = RecordIntentReflectionUseCase(fakeBlockedRepo)
+        val extendAppTimeLimitUseCase = ExtendAppTimeLimitUseCase(fakeTimeLimitRepo)
+        val timeLimitExpiryNotifier = TimeLimitExpiryNotifier()
+
+        val viewModel = HomeViewModel(
+            getHomeAppsUseCase,
+            syncInstalledAppsUseCase,
+            launchAppUseCase,
+            fakeSessionRepo,
+            recordIntentReflectionUseCase,
+            extendAppTimeLimitUseCase,
+            timeLimitExpiryNotifier
+        )
+
+        val youtube = InstalledApp(
+            packageName = "com.google.android.youtube",
+            activityName = "YouTubeActivity",
+            label = "YouTube",
+            category = AppCategory.MANAGED,
+            isEssential = false,
+            isBlockedInFocus = false
+        )
+
+        viewModel.onAppClicked(youtube) { _, _ -> }
+
+        assertTrue(viewModel.uiState.value.timeLimitExpiredDialog.isShowing)
+        assertEquals("com.google.android.youtube", viewModel.uiState.value.timeLimitExpiredDialog.packageName)
+        assertEquals("YouTube", viewModel.uiState.value.timeLimitExpiredDialog.appLabel)
+
+        // User extends by +15 minutes (Total limit becomes 30 + 15 = 45)
+        viewModel.extendEmergencyTime("com.google.android.youtube", 15)
+
+        assertFalse(viewModel.uiState.value.timeLimitExpiredDialog.isShowing)
+        assertEquals(15, fakeTimeLimitRepo.limits["com.google.android.youtube"]?.emergencyExtensionMinutes)
+        assertEquals(45, fakeTimeLimitRepo.limits["com.google.android.youtube"]?.effectiveDailyLimitMinutes)
+    }
+
+    @Test
+    fun `timeLimitExpiryNotifier event triggers timeLimitExpiredDialog automatically`() {
+        val fakeRepo = FakeHomeAppRepository()
+        val fakeSessionRepo = FakeHomeFocusSessionRepository()
+        val fakeBlockedRepo = FakeHomeBlockedAttemptRepository()
+        val fakeTimeLimitRepo = FakeHomeTimeLimitRepository()
+        val fakeUsageRepo = FakeHomeUsageStatsRepository()
+
+        val getHomeAppsUseCase = GetHomeAppsUseCase(fakeRepo)
+        val syncInstalledAppsUseCase = SyncInstalledAppsUseCase(fakeRepo)
+        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo, fakeTimeLimitRepo, fakeUsageRepo)
+        val launchAppUseCase = LaunchAppUseCase(evaluateAppLaunchUseCase, fakeRepo, fakeBlockedRepo)
+        val recordIntentReflectionUseCase = RecordIntentReflectionUseCase(fakeBlockedRepo)
+        val extendAppTimeLimitUseCase = ExtendAppTimeLimitUseCase(fakeTimeLimitRepo)
+        val timeLimitExpiryNotifier = TimeLimitExpiryNotifier()
+
+        val viewModel = HomeViewModel(
+            getHomeAppsUseCase,
+            syncInstalledAppsUseCase,
+            launchAppUseCase,
+            fakeSessionRepo,
+            recordIntentReflectionUseCase,
+            extendAppTimeLimitUseCase,
+            timeLimitExpiryNotifier
+        )
+
+        assertFalse(viewModel.uiState.value.timeLimitExpiredDialog.isShowing)
+
+        // Real-time notification arrives from accessibility background service
+        timeLimitExpiryNotifier.notifyTimeLimitExpired("com.google.android.youtube", "YouTube")
+
+        assertTrue(viewModel.uiState.value.timeLimitExpiredDialog.isShowing)
+        assertEquals("com.google.android.youtube", viewModel.uiState.value.timeLimitExpiredDialog.packageName)
+        assertEquals("YouTube", viewModel.uiState.value.timeLimitExpiredDialog.appLabel)
+    }
 }
+
