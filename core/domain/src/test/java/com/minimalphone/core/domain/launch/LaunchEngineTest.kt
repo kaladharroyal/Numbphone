@@ -15,7 +15,6 @@ import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSession
 import com.minimalphone.core.model.InstalledApp
 import com.minimalphone.core.model.SessionStatus
-import com.minimalphone.core.data.repository.BudgetRepository
 import com.minimalphone.core.data.repository.SettingsRepository
 import com.minimalphone.core.domain.emergency.EmergencyAccessManager
 import com.minimalphone.core.domain.rules.RuleEngine
@@ -153,11 +152,10 @@ class LaunchEngineTest {
         emergencyAccessManager = mockk(relaxed = true)
         coEvery { emergencyAccessManager.isEmergencyOrEssential("com.google.android.dialer") } returns true
 
-        val budgetRepo = mockk<BudgetRepository>(relaxed = true)
         val settingsRepo = mockk<SettingsRepository>(relaxed = true)
-        ruleEngine = RuleEngine(budgetRepo, settingsRepo)
         appTimeLimitRepository = FakeLaunchTimeLimitRepository()
         usageStatsRepository = FakeLaunchUsageStatsRepository()
+        ruleEngine = RuleEngine(settingsRepo, appTimeLimitRepository, usageStatsRepository)
 
         evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(
             appRepository = appRepository,

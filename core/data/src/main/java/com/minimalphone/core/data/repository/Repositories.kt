@@ -83,21 +83,6 @@ interface EssentialAppRepository {
 }
 
 /**
- * Manages daily app usage budgets.
- * Budget checks are evaluated by the RuleEngine (M13) as step 4 in the priority chain.
- */
-interface BudgetRepository {
-    fun observeAllBudgets(): Flow<List<com.minimalphone.core.model.AppBudget>>
-    suspend fun getBudget(packageName: String): com.minimalphone.core.model.AppBudget?
-    suspend fun setBudget(packageName: String, appLabel: String, dailyLimitMinutes: Int)
-    suspend fun removeBudget(packageName: String)
-    suspend fun getTodayUsageMinutes(packageName: String): Int
-    suspend fun recordUsage(packageName: String, date: String, foregroundMinutes: Int, launchCount: Int)
-    suspend fun incrementBlockedAttempt(packageName: String, date: String)
-    fun observeTodayUsage(date: String): Flow<List<com.minimalphone.core.model.DailyAppUsage>>
-}
-
-/**
  * Manages automated focus schedules and named presets (M15).
  */
 interface ScheduleRepository {

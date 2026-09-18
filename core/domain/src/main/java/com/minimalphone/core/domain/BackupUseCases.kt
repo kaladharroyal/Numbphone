@@ -1,7 +1,7 @@
 package com.minimalphone.core.domain
 
 import com.minimalphone.core.data.repository.AppRepository
-import com.minimalphone.core.data.repository.BudgetRepository
+import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.ContactRepository
 import com.minimalphone.core.data.repository.EssentialAppRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
@@ -40,7 +40,7 @@ class ExportBackupJsonUseCase @Inject constructor(
     private val appRepository: AppRepository,
     private val focusSessionRepository: FocusSessionRepository,
     private val settingsRepository: SettingsRepository,
-    private val budgetRepository: BudgetRepository,
+    private val appTimeLimitRepository: AppTimeLimitRepository,
     private val scheduleRepository: ScheduleRepository,
     private val essentialAppRepository: EssentialAppRepository,
     private val contactRepository: ContactRepository
@@ -55,7 +55,7 @@ class ExportBackupJsonUseCase @Inject constructor(
         val theme = settingsRepository.appTheme.first()
         val dumbMode = settingsRepository.isDumbModeEnabled.first()
 
-        val budgets = budgetRepository.observeAllBudgets().first()
+        val timeLimits = appTimeLimitRepository.observeAllLimits().first()
         val schedules = scheduleRepository.observeSchedules().first()
         val essentials = essentialAppRepository.observeEssentialApps().first()
         val contacts = contactRepository.observeAllContacts().first()
@@ -99,17 +99,16 @@ class ExportBackupJsonUseCase @Inject constructor(
         }
         root.put("focusSessions", sessionsArray)
 
-        // Budgets (M14)
-        val budgetsArray = JSONArray()
-        budgets.forEach { b ->
-            val bObj = JSONObject()
-            bObj.put("packageName", b.packageName)
-            bObj.put("appLabel", b.appLabel)
-            bObj.put("dailyLimitMinutes", b.dailyLimitMinutes)
-            bObj.put("enabled", b.enabled)
-            budgetsArray.put(bObj)
+        // Time limits
+        val limitsArray = JSONArray()
+        timeLimits.forEach { limit ->
+            val lObj = JSONObject()
+            lObj.put("packageName", limit.packageName)
+            lObj.put("dailyLimitMinutes", limit.dailyLimitMinutes)
+            lObj.put("isEnabled", limit.isEnabled)
+            limitsArray.put(lObj)
         }
-        root.put("budgets", budgetsArray)
+        root.put("timeLimits", limitsArray)
 
         // Schedules (M15)
         val schedulesArray = JSONArray()
@@ -164,7 +163,7 @@ class ImportBackupJsonUseCase @Inject constructor(
     private val appRepository: AppRepository,
     private val focusSessionRepository: FocusSessionRepository,
     private val settingsRepository: SettingsRepository,
-    private val budgetRepository: BudgetRepository,
+    private val appTimeLimitRepository: AppTimeLimitRepository,
     private val scheduleRepository: ScheduleRepository,
     private val essentialAppRepository: EssentialAppRepository,
     private val contactRepository: ContactRepository
@@ -270,15 +269,24 @@ class ImportBackupJsonUseCase @Inject constructor(
                 }
             }
 
-            // 4. Restore Budgets
-            if (root.has("budgets")) {
+            // 4. Restore Time Limits (supports "timeLimits" or legacy "budgets")
+            if (root.has("timeLimits")) {
+                val limitsArray = root.getJSONArray("timeLimits")
+                for (i in 0 until limitsArray.length()) {
+                    val lObj = limitsArray.getJSONObject(i)
+                    val pkg = lObj.getString("packageName")
+                    val limit = lObj.optInt("dailyLimitMinutes", 30)
+                    val isEnabled = lObj.optBoolean("isEnabled", true)
+                    appTimeLimitRepository.setLimit(pkg, limit, isEnabled)
+                }
+            } else if (root.has("budgets")) {
                 val budgetsArray = root.getJSONArray("budgets")
                 for (i in 0 until budgetsArray.length()) {
                     val bObj = budgetsArray.getJSONObject(i)
                     val pkg = bObj.getString("packageName")
-                    val label = bObj.optString("appLabel", pkg)
                     val limit = bObj.optInt("dailyLimitMinutes", 30)
-                    budgetRepository.setBudget(pkg, label, limit)
+                    val isEnabled = bObj.optBoolean("enabled", true)
+                    appTimeLimitRepository.setLimit(pkg, limit, isEnabled)
                 }
             }
 

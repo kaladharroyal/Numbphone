@@ -146,26 +146,6 @@ interface EssentialAppDao {
     suspend fun exists(packageName: String): Int
 }
 
-// ─────────── M14: Daily App Budgets ───────────
-
-@Dao
-interface AppBudgetDao {
-
-    @Query("SELECT * FROM app_budgets WHERE enabled = 1 ORDER BY packageName")
-    fun observeActiveBudgets(): Flow<List<com.minimalphone.core.data.db.entity.AppBudgetEntity>>
-
-    @Query("SELECT * FROM app_budgets ORDER BY packageName")
-    fun observeAllBudgets(): Flow<List<com.minimalphone.core.data.db.entity.AppBudgetEntity>>
-
-    @Query("SELECT * FROM app_budgets WHERE packageName = :packageName LIMIT 1")
-    suspend fun getBudget(packageName: String): com.minimalphone.core.data.db.entity.AppBudgetEntity?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(budget: com.minimalphone.core.data.db.entity.AppBudgetEntity)
-
-    @Query("DELETE FROM app_budgets WHERE packageName = :packageName")
-    suspend fun delete(packageName: String)
-}
 
 @Dao
 interface DailyAppUsageDao {

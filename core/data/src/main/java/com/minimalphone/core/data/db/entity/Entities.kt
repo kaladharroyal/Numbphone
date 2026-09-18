@@ -99,20 +99,6 @@ data class EssentialAppEntity(
     val addedTimestamp: Long = System.currentTimeMillis()
 )
 
-// ─────────── M14: Daily App Budgets ───────────
-
-/**
- * User-defined daily usage limit per app.
- * When the app's foreground time today exceeds [dailyLimitMinutes], the RuleEngine blocks it.
- */
-@Entity(tableName = "app_budgets")
-data class AppBudgetEntity(
-    @PrimaryKey val packageName: String,
-    /** 0 = disabled. Positive value = daily limit in minutes. */
-    val dailyLimitMinutes: Int,
-    val enabled: Boolean = true,
-    val createdTimestamp: Long = System.currentTimeMillis()
-)
 
 /**
  * Tracks how long each app was used on a given calendar day.

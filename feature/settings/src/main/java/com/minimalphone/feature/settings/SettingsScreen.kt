@@ -65,8 +65,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.minimalphone.core.model.AppBudget
 import com.minimalphone.core.model.AppTheme
+import com.minimalphone.core.model.AppTimeLimit
 import com.minimalphone.core.model.DailyAppUsage
 import com.minimalphone.core.model.InstalledApp
 import com.minimalphone.core.ui.theme.MutedText
@@ -82,15 +82,14 @@ fun SettingsScreen(
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val backupStatus by viewModel.backupStatus.collectAsStateWithLifecycle()
     val essentialApps by viewModel.essentialApps.collectAsStateWithLifecycle()
-    val budgets by viewModel.budgets.collectAsStateWithLifecycle()
-    val todayUsage by viewModel.todayUsage.collectAsStateWithLifecycle()
+    val timeLimits by viewModel.timeLimits.collectAsStateWithLifecycle()
     val allInstalledApps by viewModel.allInstalledApps.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var showImportDialog by remember { mutableStateOf(false) }
     var importJsonText by remember { mutableStateOf("") }
     var importErrorText by remember { mutableStateOf<String?>(null) }
-    var showAddBudgetDialog by remember { mutableStateOf(false) }
+    var showAddTimeLimitDialog by remember { mutableStateOf(false) }
 
     val feedbackFormUrl = "https://forms.gle/T3xsTRHTx2uDaoVP6"
 
@@ -262,18 +261,17 @@ fun SettingsScreen(
                     )
                 }
 
-                // Section 4b: Daily App Budgets
+                // Section 4b: Daily App Limits
                 item {
                     SectionHeader(title = "DAILY APP USAGE LIMITS")
                 }
 
                 item {
-                    DailyAppBudgetsCard(
-                        budgets = budgets,
-                        todayUsage = todayUsage,
+                    DailyAppLimitsCard(
+                        limits = timeLimits,
                         installedApps = allInstalledApps,
-                        onAddBudgetClick = { showAddBudgetDialog = true },
-                        onRemoveBudget = { pkg -> viewModel.onRemoveBudget(pkg) }
+                        onAddLimitClick = { showAddTimeLimitDialog = true },
+                        onRemoveLimit = { pkg -> viewModel.onRemoveTimeLimit(pkg) }
                     )
                 }
 
@@ -437,13 +435,13 @@ fun SettingsScreen(
         )
     }
 
-    if (showAddBudgetDialog) {
-        AddBudgetDialog(
+    if (showAddTimeLimitDialog) {
+        AddTimeLimitDialog(
             installedApps = allInstalledApps,
-            onDismiss = { showAddBudgetDialog = false },
-            onConfirm = { pkg, label, limitMinutes, pinToHome ->
-                viewModel.onSetBudget(pkg, label, limitMinutes, pinToHome)
-                showAddBudgetDialog = false
+            onDismiss = { showAddTimeLimitDialog = false },
+            onConfirm = { pkg, limitMinutes, pinToHome ->
+                viewModel.onSetTimeLimit(pkg, limitMinutes, pinToHome)
+                showAddTimeLimitDialog = false
             }
         )
     }
@@ -1078,14 +1076,12 @@ private fun EssentialAccessCard(
  * Displays user-defined daily app usage limits and current daily consumption.
  */
 @Composable
-private fun DailyAppBudgetsCard(
-    budgets: List<AppBudget>,
-    todayUsage: List<DailyAppUsage>,
+private fun DailyAppLimitsCard(
+    limits: List<AppTimeLimit>,
     installedApps: List<InstalledApp> = emptyList(),
-    onAddBudgetClick: () -> Unit,
-    onRemoveBudget: (String) -> Unit
+    onAddLimitClick: () -> Unit,
+    onRemoveLimit: (String) -> Unit
 ) {
-    val usageMap = remember(todayUsage) { todayUsage.associateBy { it.packageName } }
     val appsMap = remember(installedApps) { installedApps.associateBy { it.packageName } }
 
     Column(
@@ -1112,17 +1108,17 @@ private fun DailyAppBudgetsCard(
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
-                    text = "Daily App Budgets",
+                    text = "Daily App Limits",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold
                 )
             }
 
-            IconButton(onClick = onAddBudgetClick, modifier = Modifier.size(28.dp)) {
+            IconButton(onClick = onAddLimitClick, modifier = Modifier.size(28.dp)) {
                 Icon(
                     imageVector = Icons.Outlined.Add,
-                    contentDescription = "Add Budget",
+                    contentDescription = "Add Limit",
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
@@ -1130,26 +1126,21 @@ private fun DailyAppBudgetsCard(
         }
 
         Text(
-            text = "Set hard daily limits. Once an app reaches its budget today, it is strictly blocked until midnight.",
+            text = "Set hard daily limits. Once an app reaches its time limit today, it is strictly blocked until midnight.",
             style = MaterialTheme.typography.bodySmall,
             color = MutedText,
             lineHeight = 18.sp
         )
 
-        if (budgets.isEmpty()) {
+        if (limits.isEmpty()) {
             Text(
-                text = "No app budgets active. Tap + above to set a limit for distracting apps.",
+                text = "No app limits active. Tap + above to set a limit for distracting apps.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MutedText
             )
         } else {
-            budgets.forEach { budget ->
-                val used = usageMap[budget.packageName]?.foregroundMinutes ?: 0
-                val progress = if (budget.dailyLimitMinutes > 0) {
-                    (used.toFloat() / budget.dailyLimitMinutes).coerceIn(0f, 1f)
-                } else 0f
-                val isExceeded = used >= budget.dailyLimitMinutes
-                val displayName = appsMap[budget.packageName]?.label ?: budget.appLabel.ifBlank { budget.packageName }
+            limits.forEach { limit ->
+                val displayName = appsMap[limit.packageName]?.label ?: limit.packageName
 
                 Column(
                     modifier = Modifier
@@ -1170,13 +1161,13 @@ private fun DailyAppBudgetsCard(
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                text = "${used}m / ${budget.dailyLimitMinutes}m",
+                                text = "${limit.dailyLimitMinutes}m daily limit",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (isExceeded) Color(0xFFFF453A) else MutedText
+                                color = MutedText
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             TextButton(
-                                onClick = { onRemoveBudget(budget.packageName) },
+                                onClick = { onRemoveLimit(limit.packageName) },
                                 modifier = Modifier.height(24.dp),
                                 contentPadding = PaddingValues(0.dp)
                             ) {
@@ -1188,15 +1179,6 @@ private fun DailyAppBudgetsCard(
                             }
                         }
                     }
-
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp),
-                        color = if (isExceeded) Color(0xFFFF453A) else MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.outline
-                    )
                 }
             }
         }
@@ -1204,20 +1186,18 @@ private fun DailyAppBudgetsCard(
 }
 
 /**
- * Dialog to configure a daily time budget for a selected installed app.
+ * Dialog to configure a daily time limit for a selected installed app.
  */
 @Composable
-private fun AddBudgetDialog(
+private fun AddTimeLimitDialog(
     installedApps: List<InstalledApp>,
     onDismiss: () -> Unit,
-    onConfirm: (packageName: String, appLabel: String, limitMinutes: Int, pinToHome: Boolean) -> Unit
+    onConfirm: (packageName: String, limitMinutes: Int, pinToHome: Boolean) -> Unit
 ) {
     var selectedPkg by remember { mutableStateOf(installedApps.firstOrNull()?.packageName ?: "") }
     var limitMinutes by remember { mutableStateOf(30) }
     var pinToHome by remember { mutableStateOf(true) }
     val presetDurations = listOf(15, 30, 45, 60, 90, 120)
-
-    val selectedApp = installedApps.find { it.packageName == selectedPkg }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1368,7 +1348,7 @@ private fun AddBudgetDialog(
             Button(
                 onClick = {
                     if (selectedPkg.isNotBlank()) {
-                        onConfirm(selectedPkg, selectedApp?.label ?: selectedPkg, limitMinutes, pinToHome)
+                        onConfirm(selectedPkg, limitMinutes, pinToHome)
                     }
                 },
                 colors = ButtonDefaults.buttonColors(

@@ -1,7 +1,8 @@
 package com.minimalphone.core.domain.rules
 
-import com.minimalphone.core.data.repository.BudgetRepository
+import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.SettingsRepository
+import com.minimalphone.core.data.repository.UsageStatsRepository
 import com.minimalphone.core.model.AppLaunchDecision
 import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSession
@@ -31,13 +32,14 @@ data class RuleContext(
  *  1. DB-Essential flag    → EmergencyAllow
  *  2. Dumb Mode active (M16) → Block if not an essential app
  *  3. Focus session active (M13/M15) → Block or ShowFriction (by mode)
- *  4. Daily budget exhausted (M14) → Block
+ *  4. Daily time limit exhausted → Block
  *  5. Allow
  */
 @Singleton
 class RuleEngine @Inject constructor(
-    private val budgetRepository: BudgetRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val appTimeLimitRepository: AppTimeLimitRepository,
+    private val usageStatsRepository: UsageStatsRepository
 ) {
 
     suspend fun evaluate(context: RuleContext): AppLaunchDecision {
@@ -71,8 +73,7 @@ class RuleEngine @Inject constructor(
 
         // Step 3: No active focus session
         if (session == null || !session.isCurrentlyActive) {
-            // Step 4 (budget) also applies outside focus sessions
-            return evaluateBudget(app) ?: AppLaunchDecision.Allow(
+            return evaluateTimeLimit(app) ?: AppLaunchDecision.Allow(
                 packageName = app.packageName,
                 activityName = app.activityName
             )
@@ -93,25 +94,25 @@ class RuleEngine @Inject constructor(
             )
         }
 
-        // If focus already blocks, no need to check budget
+        // If focus already blocks, no need to check daily time limits
         if (focusDecision is AppLaunchDecision.Block) return focusDecision
 
-        // Step 4: Budget check (applies even in LIGHT focus after friction would be shown)
-        return evaluateBudget(app) ?: focusDecision
+        // Step 4: Daily time limit check (applies even in LIGHT focus)
+        return evaluateTimeLimit(app) ?: focusDecision
     }
 
     /**
-     * Returns a Block decision if today's budget is exhausted, or null if no budget applies.
+     * Returns a Block decision if today's daily time limit is exhausted, or null if no limit applies.
      */
-    private suspend fun evaluateBudget(app: InstalledApp): AppLaunchDecision.Block? {
-        val budget = budgetRepository.getBudget(app.packageName) ?: return null
-        if (!budget.enabled || budget.dailyLimitMinutes <= 0) return null
+    private suspend fun evaluateTimeLimit(app: InstalledApp): AppLaunchDecision.Block? {
+        val limit = appTimeLimitRepository.getLimit(app.packageName) ?: return null
+        if (!limit.isEnabled || limit.effectiveDailyLimitMinutes <= 0) return null
 
-        val usedMinutes = budgetRepository.getTodayUsageMinutes(app.packageName)
-        return if (usedMinutes >= budget.dailyLimitMinutes) {
+        val usedMinutes = usageStatsRepository.getTodayUsageMinutes(app.packageName)
+        return if (usedMinutes >= limit.effectiveDailyLimitMinutes) {
             AppLaunchDecision.Block(
                 packageName = app.packageName,
-                reason = "You've used ${app.label} for ${usedMinutes} min today (limit: ${budget.dailyLimitMinutes} min).",
+                reason = "Daily limit of ${limit.formattedEffectiveLimit} reached for today (${usedMinutes}m used).",
                 activeSession = null
             )
         } else null

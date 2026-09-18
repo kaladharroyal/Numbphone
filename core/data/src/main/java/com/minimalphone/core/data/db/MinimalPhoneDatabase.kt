@@ -4,7 +4,6 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.minimalphone.core.data.db.converters.MinimalConverters
-import com.minimalphone.core.data.db.dao.AppBudgetDao
 import com.minimalphone.core.data.db.dao.AppRuleDao
 import com.minimalphone.core.data.db.dao.AppTimeLimitDao
 import com.minimalphone.core.data.db.dao.BlockedAttemptDao
@@ -17,7 +16,6 @@ import com.minimalphone.core.data.db.dao.FocusScheduleDao
 import com.minimalphone.core.data.db.dao.FocusSessionDao
 import com.minimalphone.core.data.db.dao.InstalledAppDao
 import com.minimalphone.core.data.db.dao.QuickContactDao
-import com.minimalphone.core.data.db.entity.AppBudgetEntity
 import com.minimalphone.core.data.db.entity.AppRuleEntity
 import com.minimalphone.core.data.db.entity.AppTimeLimitEntity
 import com.minimalphone.core.data.db.entity.BlockedAttemptEntity
@@ -41,7 +39,6 @@ import com.minimalphone.core.data.db.entity.QuickContactEntity
         ExitAttemptEntity::class,
         FocusGoalEntity::class,
         EssentialAppEntity::class,
-        AppBudgetEntity::class,
         DailyAppUsageEntity::class,
         FocusPresetEntity::class,
         FocusScheduleEntity::class,
@@ -49,7 +46,7 @@ import com.minimalphone.core.data.db.entity.QuickContactEntity
         QuickContactEntity::class,
         AppTimeLimitEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 @TypeConverters(MinimalConverters::class)
@@ -60,7 +57,6 @@ abstract class MinimalPhoneDatabase : RoomDatabase() {
     abstract fun blockedAttemptDao(): BlockedAttemptDao
     abstract fun exitAttemptDao(): ExitAttemptDao
     abstract fun essentialAppDao(): EssentialAppDao
-    abstract fun appBudgetDao(): AppBudgetDao
     abstract fun dailyAppUsageDao(): DailyAppUsageDao
     abstract fun focusPresetDao(): FocusPresetDao
     abstract fun focusScheduleDao(): FocusScheduleDao

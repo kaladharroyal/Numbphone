@@ -3,7 +3,7 @@ package com.minimalphone.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.minimalphone.core.data.repository.AppRepository
-import com.minimalphone.core.data.repository.BudgetRepository
+import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.EssentialAppRepository
 import com.minimalphone.core.domain.BackupExportResult
 import com.minimalphone.core.domain.BackupImportResult
@@ -17,9 +17,8 @@ import com.minimalphone.core.domain.UpdateDefaultFocusDurationUseCase
 import com.minimalphone.core.domain.UpdateDumbModeUseCase
 import com.minimalphone.core.domain.UpdateLocalAnalyticsUseCase
 import com.minimalphone.core.domain.UserSettings
-import com.minimalphone.core.model.AppBudget
 import com.minimalphone.core.model.AppTheme
-import com.minimalphone.core.model.DailyAppUsage
+import com.minimalphone.core.model.AppTimeLimit
 import com.minimalphone.core.model.EssentialApp
 import com.minimalphone.core.model.InstalledApp
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,7 +28,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 import javax.inject.Inject
 
 @HiltViewModel
@@ -45,7 +43,7 @@ class SettingsViewModel @Inject constructor(
     private val exportBackupJsonUseCase: ExportBackupJsonUseCase,
     private val importBackupJsonUseCase: ImportBackupJsonUseCase,
     private val essentialAppRepository: EssentialAppRepository,
-    private val budgetRepository: BudgetRepository,
+    private val appTimeLimitRepository: AppTimeLimitRepository,
     private val appRepository: AppRepository
 ) : ViewModel() {
 
@@ -64,25 +62,16 @@ class SettingsViewModel @Inject constructor(
                 initialValue = emptyList()
             )
 
-    /** Live list of all configured budgets. */
-    val budgets: StateFlow<List<AppBudget>> =
-        budgetRepository.observeAllBudgets()
+    /** Live list of all configured daily time limits. */
+    val timeLimits: StateFlow<List<AppTimeLimit>> =
+        appTimeLimitRepository.observeAllLimits()
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = emptyList()
             )
 
-    /** Live list of today's app usages. */
-    val todayUsage: StateFlow<List<DailyAppUsage>> =
-        budgetRepository.observeTodayUsage(LocalDate.now().toString())
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = emptyList()
-            )
-
-    /** Installed apps for setting up new budgets. */
+    /** Installed apps for setting up new limits. */
     val allInstalledApps: StateFlow<List<InstalledApp>> =
         appRepository.getAllApps()
             .stateIn(
@@ -135,18 +124,18 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun onSetBudget(packageName: String, label: String, limitMinutes: Int, pinToHome: Boolean = false) {
+    fun onSetTimeLimit(packageName: String, limitMinutes: Int, pinToHome: Boolean = false) {
         viewModelScope.launch {
-            budgetRepository.setBudget(packageName, label, limitMinutes)
+            appTimeLimitRepository.setLimit(packageName, limitMinutes, isEnabled = true)
             if (pinToHome) {
                 appRepository.toggleFavoriteOnHome(packageName, true)
             }
         }
     }
 
-    fun onRemoveBudget(packageName: String) {
+    fun onRemoveTimeLimit(packageName: String) {
         viewModelScope.launch {
-            budgetRepository.removeBudget(packageName)
+            appTimeLimitRepository.removeLimit(packageName)
         }
     }
 

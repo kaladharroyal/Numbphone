@@ -76,3 +76,16 @@ data class AppTimeLimit(
         }
     }
 }
+
+/**
+ * Domain model for an app's tracked usage on a specific calendar day.
+ */
+data class DailyAppUsage(
+    val packageName: String,
+    val appLabel: String = "",
+    /** ISO-8601 date e.g. "2026-09-18" */
+    val date: String,
+    val foregroundMinutes: Int,
+    val launchCount: Int,
+    val blockedAttempts: Int
+)

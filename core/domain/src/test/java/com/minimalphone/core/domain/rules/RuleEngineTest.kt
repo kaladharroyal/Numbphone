@@ -1,12 +1,13 @@
 package com.minimalphone.core.domain.rules
 
-import com.minimalphone.core.data.repository.BudgetRepository
+import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.SettingsRepository
-import com.minimalphone.core.model.AppBudget
+import com.minimalphone.core.data.repository.UsageStatsRepository
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.AppLaunchDecision
 import com.minimalphone.core.model.AppTheme
-import com.minimalphone.core.model.DailyAppUsage
+import com.minimalphone.core.model.AppTimeLimit
+import com.minimalphone.core.model.DailyUsageSummary
 import com.minimalphone.core.model.FocusGoal
 import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSession
@@ -20,24 +21,29 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-class FakeBudgetRepo : BudgetRepository {
-    val budgets = mutableMapOf<String, AppBudget>()
-    val usageMap = mutableMapOf<String, Int>()
+class FakeRuleTimeLimitRepo : AppTimeLimitRepository {
+    val limits = mutableMapOf<String, AppTimeLimit>()
 
-    override fun observeAllBudgets(): Flow<List<AppBudget>> = MutableStateFlow(budgets.values.toList())
-    override suspend fun getBudget(packageName: String): AppBudget? = budgets[packageName]
-    override suspend fun setBudget(packageName: String, appLabel: String, dailyLimitMinutes: Int) {
-        budgets[packageName] = AppBudget(packageName, appLabel, dailyLimitMinutes)
+    override fun observeAllLimits(): Flow<List<AppTimeLimit>> = MutableStateFlow(limits.values.toList())
+    override suspend fun getLimit(packageName: String): AppTimeLimit? = limits[packageName]
+    override fun observeLimit(packageName: String): Flow<AppTimeLimit?> = MutableStateFlow(limits[packageName])
+    override suspend fun setLimit(packageName: String, limitMinutes: Int, isEnabled: Boolean) {
+        limits[packageName] = AppTimeLimit(packageName, limitMinutes, isEnabled)
     }
-    override suspend fun removeBudget(packageName: String) {
-        budgets.remove(packageName)
+    override suspend fun addEmergencyExtension(packageName: String, additionalMinutes: Int) {
+        val cur = limits[packageName] ?: AppTimeLimit(packageName, 0)
+        limits[packageName] = cur.copy(emergencyExtensionMinutes = cur.emergencyExtensionMinutes + additionalMinutes)
     }
-    override suspend fun getTodayUsageMinutes(packageName: String): Int = usageMap[packageName] ?: 0
-    override suspend fun recordUsage(packageName: String, date: String, foregroundMinutes: Int, launchCount: Int) {
-        usageMap[packageName] = foregroundMinutes
+    override suspend fun removeLimit(packageName: String) {
+        limits.remove(packageName)
     }
-    override suspend fun incrementBlockedAttempt(packageName: String, date: String) {}
-    override fun observeTodayUsage(date: String): Flow<List<DailyAppUsage>> = MutableStateFlow(emptyList())
+}
+
+class FakeRuleUsageStatsRepo : UsageStatsRepository {
+    val usageMap = mutableMapOf<String, Long>()
+    override fun getDailyUsageSummary(): Flow<DailyUsageSummary> = MutableStateFlow(DailyUsageSummary())
+    override suspend fun hasUsagePermission(): Boolean = true
+    override suspend fun getTodayUsageMinutes(packageName: String): Long = usageMap[packageName] ?: 0L
 }
 
 class FakeSettingsRepo : SettingsRepository {
@@ -63,15 +69,17 @@ class FakeSettingsRepo : SettingsRepository {
 
 class RuleEngineTest {
 
-    private lateinit var budgetRepo: FakeBudgetRepo
+    private lateinit var timeLimitRepo: FakeRuleTimeLimitRepo
+    private lateinit var usageStatsRepo: FakeRuleUsageStatsRepo
     private lateinit var settingsRepo: FakeSettingsRepo
     private lateinit var ruleEngine: RuleEngine
 
     @Before
     fun setup() {
-        budgetRepo = FakeBudgetRepo()
+        timeLimitRepo = FakeRuleTimeLimitRepo()
+        usageStatsRepo = FakeRuleUsageStatsRepo()
         settingsRepo = FakeSettingsRepo()
-        ruleEngine = RuleEngine(budgetRepo, settingsRepo)
+        ruleEngine = RuleEngine(settingsRepo, timeLimitRepo, usageStatsRepo)
     }
 
     @Test
@@ -167,9 +175,9 @@ class RuleEngineTest {
     }
 
     @Test
-    fun `step 4 - daily budget exhaustion blocks app launch`() = runTest {
-        budgetRepo.setBudget("com.youtube", "YouTube", dailyLimitMinutes = 30)
-        budgetRepo.usageMap["com.youtube"] = 35 // exceeded!
+    fun `step 4 - daily time limit exhaustion blocks app launch`() = runTest {
+        timeLimitRepo.setLimit("com.youtube", limitMinutes = 30, isEnabled = true)
+        usageStatsRepo.usageMap["com.youtube"] = 35L // exceeded!
 
         val app = InstalledApp(
             packageName = "com.youtube",
@@ -181,13 +189,13 @@ class RuleEngineTest {
         val decision = ruleEngine.evaluate(context)
 
         assertTrue(decision is AppLaunchDecision.Block)
-        assertTrue((decision as AppLaunchDecision.Block).reason.contains("limit: 30 min"))
+        assertTrue((decision as AppLaunchDecision.Block).reason.contains("Daily limit of 30m reached"))
     }
 
     @Test
     fun `step 5 - default allows launch when no restrictions match`() = runTest {
-        budgetRepo.setBudget("com.notes", "Notes", dailyLimitMinutes = 60)
-        budgetRepo.usageMap["com.notes"] = 10 // well within budget
+        timeLimitRepo.setLimit("com.notes", limitMinutes = 60, isEnabled = true)
+        usageStatsRepo.usageMap["com.notes"] = 10L // well within limit
 
         val app = InstalledApp(
             packageName = "com.notes",

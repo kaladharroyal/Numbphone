@@ -3,7 +3,6 @@ package com.minimalphone.core.data.di
 import android.content.Context
 import androidx.room.Room
 import com.minimalphone.core.data.db.MinimalPhoneDatabase
-import com.minimalphone.core.data.db.dao.AppBudgetDao
 import com.minimalphone.core.data.db.dao.AppRuleDao
 import com.minimalphone.core.data.db.dao.BlockedAttemptDao
 import com.minimalphone.core.data.db.dao.DailyAppUsageDao
@@ -52,9 +51,6 @@ object DatabaseModule {
 
     @Provides
     fun provideEssentialAppDao(db: MinimalPhoneDatabase): EssentialAppDao = db.essentialAppDao()
-
-    @Provides
-    fun provideAppBudgetDao(db: MinimalPhoneDatabase): AppBudgetDao = db.appBudgetDao()
 
     @Provides
     fun provideDailyAppUsageDao(db: MinimalPhoneDatabase): DailyAppUsageDao = db.dailyAppUsageDao()

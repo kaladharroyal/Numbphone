@@ -76,12 +76,6 @@ object DataModule {
 
     @Provides
     @Singleton
-    fun provideBudgetRepository(
-        impl: com.minimalphone.core.data.repository.DefaultBudgetRepository
-    ): com.minimalphone.core.data.repository.BudgetRepository = impl
-
-    @Provides
-    @Singleton
     fun provideScheduleRepository(
         impl: com.minimalphone.core.data.repository.DefaultScheduleRepository
     ): com.minimalphone.core.data.repository.ScheduleRepository = impl
