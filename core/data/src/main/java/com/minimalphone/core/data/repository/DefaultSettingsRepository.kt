@@ -34,6 +34,8 @@ class DefaultSettingsRepository @Inject constructor(
         val DEFAULT_FOCUS_DURATION = intPreferencesKey("default_focus_duration")
         val LOCAL_ANALYTICS_ENABLED = booleanPreferencesKey("local_analytics_enabled")
         val APP_THEME = androidx.datastore.preferences.core.stringPreferencesKey("app_theme")
+        val DUMB_MODE_ENABLED = booleanPreferencesKey("dumb_mode_enabled")
+        val AUTO_GRAYSCALE_IN_FOCUS = booleanPreferencesKey("auto_grayscale_in_focus")
     }
 
     override val isOnboardingCompleted: Flow<Boolean> = dataStore.data
@@ -76,6 +78,22 @@ class DefaultSettingsRepository @Inject constructor(
             com.minimalphone.core.model.AppTheme.fromName(preferences[PreferencesKeys.APP_THEME])
         }
 
+    override val isDumbModeEnabled: Flow<Boolean> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.DUMB_MODE_ENABLED] ?: false
+        }
+
+    override val isAutoGrayscaleInFocusEnabled: Flow<Boolean> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.AUTO_GRAYSCALE_IN_FOCUS] ?: false
+        }
+
     override suspend fun setOnboardingCompleted(completed: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.ONBOARDING_COMPLETED] = completed
@@ -103,6 +121,18 @@ class DefaultSettingsRepository @Inject constructor(
     override suspend fun setAppTheme(theme: com.minimalphone.core.model.AppTheme) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.APP_THEME] = theme.name
+        }
+    }
+
+    override suspend fun setDumbModeEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DUMB_MODE_ENABLED] = enabled
+        }
+    }
+
+    override suspend fun setAutoGrayscaleInFocusEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.AUTO_GRAYSCALE_IN_FOCUS] = enabled
         }
     }
 }

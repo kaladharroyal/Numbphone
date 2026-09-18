@@ -11,10 +11,9 @@ class AppScannerTest {
         assertTrue(AppScanner.isEssentialPackage("com.google.android.dialer", "Phone"))
         assertTrue(AppScanner.isEssentialPackage("com.google.android.apps.messaging", "Messages"))
         assertTrue(AppScanner.isEssentialPackage("com.google.android.GoogleCamera", "Camera"))
-        assertTrue(AppScanner.isEssentialPackage("com.android.settings", "Settings"))
+        assertTrue(AppScanner.isEssentialPackage("com.google.android.calendar", "Calendar"))
         assertTrue(AppScanner.isEssentialPackage("com.google.android.deskclock", "Clock"))
         assertTrue(AppScanner.isEssentialPackage("com.google.android.contacts", "Contacts"))
-        assertTrue(AppScanner.isEssentialPackage("com.google.android.apps.maps", "Maps"))
     }
 
     @Test

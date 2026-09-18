@@ -3,8 +3,11 @@ package com.minimalphone.core.data.di
 import android.content.Context
 import androidx.room.Room
 import com.minimalphone.core.data.db.MinimalPhoneDatabase
+import com.minimalphone.core.data.db.dao.AppBudgetDao
 import com.minimalphone.core.data.db.dao.AppRuleDao
 import com.minimalphone.core.data.db.dao.BlockedAttemptDao
+import com.minimalphone.core.data.db.dao.DailyAppUsageDao
+import com.minimalphone.core.data.db.dao.EssentialAppDao
 import com.minimalphone.core.data.db.dao.ExitAttemptDao
 import com.minimalphone.core.data.db.dao.FocusSessionDao
 import com.minimalphone.core.data.db.dao.InstalledAppDao
@@ -46,4 +49,25 @@ object DatabaseModule {
 
     @Provides
     fun provideExitAttemptDao(db: MinimalPhoneDatabase): ExitAttemptDao = db.exitAttemptDao()
+
+    @Provides
+    fun provideEssentialAppDao(db: MinimalPhoneDatabase): EssentialAppDao = db.essentialAppDao()
+
+    @Provides
+    fun provideAppBudgetDao(db: MinimalPhoneDatabase): AppBudgetDao = db.appBudgetDao()
+
+    @Provides
+    fun provideDailyAppUsageDao(db: MinimalPhoneDatabase): DailyAppUsageDao = db.dailyAppUsageDao()
+
+    @Provides
+    fun provideFocusPresetDao(db: MinimalPhoneDatabase): com.minimalphone.core.data.db.dao.FocusPresetDao = db.focusPresetDao()
+
+    @Provides
+    fun provideFocusScheduleDao(db: MinimalPhoneDatabase): com.minimalphone.core.data.db.dao.FocusScheduleDao = db.focusScheduleDao()
+
+    @Provides
+    fun provideDigestNotificationDao(db: MinimalPhoneDatabase): com.minimalphone.core.data.db.dao.DigestNotificationDao = db.digestNotificationDao()
+
+    @Provides
+    fun provideQuickContactDao(db: MinimalPhoneDatabase): com.minimalphone.core.data.db.dao.QuickContactDao = db.quickContactDao()
 }

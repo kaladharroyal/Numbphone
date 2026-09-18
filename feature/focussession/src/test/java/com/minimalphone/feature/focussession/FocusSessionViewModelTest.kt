@@ -119,7 +119,10 @@ class FocusSessionViewModelTest {
             cancelFocusSessionUseCase = cancelFocusSessionUseCase,
             prepareExitAttemptUseCase = prepareExitAttemptUseCase,
             completeExitAttemptUseCase = completeExitAttemptUseCase,
-            abortExitAttemptUseCase = abortExitAttemptUseCase
+            abortExitAttemptUseCase = abortExitAttemptUseCase,
+            scheduleRepository = io.mockk.mockk(relaxed = true),
+            focusScheduler = io.mockk.mockk(relaxed = true),
+            settingsRepository = io.mockk.mockk(relaxed = true)
         )
     }
 

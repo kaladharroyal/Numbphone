@@ -12,6 +12,9 @@ import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSession
 import com.minimalphone.core.model.InstalledApp
 import com.minimalphone.core.model.SessionStatus
+import com.minimalphone.core.domain.emergency.EmergencyAccessManager
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -72,6 +75,7 @@ class BypassEngineTest {
     private lateinit var appRepository: FakeBypassAppRepository
     private lateinit var focusSessionRepository: FakeBypassFocusSessionRepository
     private lateinit var blockedAttemptRepository: FakeBypassBlockedAttemptRepository
+    private lateinit var emergencyAccessManager: EmergencyAccessManager
     private lateinit var evaluateBypassRouteUseCase: EvaluateBypassRouteUseCase
     private lateinit var recordBypassAttemptUseCase: RecordBypassAttemptUseCase
 
@@ -80,8 +84,10 @@ class BypassEngineTest {
         appRepository = FakeBypassAppRepository()
         focusSessionRepository = FakeBypassFocusSessionRepository()
         blockedAttemptRepository = FakeBypassBlockedAttemptRepository()
+        emergencyAccessManager = mockk(relaxed = true)
+        coEvery { emergencyAccessManager.isEmergencyOrEssential("com.google.android.dialer") } returns true
 
-        evaluateBypassRouteUseCase = EvaluateBypassRouteUseCase(appRepository, focusSessionRepository)
+        evaluateBypassRouteUseCase = EvaluateBypassRouteUseCase(appRepository, focusSessionRepository, emergencyAccessManager)
         recordBypassAttemptUseCase = RecordBypassAttemptUseCase(
             appRepository = appRepository,
             blockedAttemptRepository = blockedAttemptRepository,

@@ -12,6 +12,14 @@ enum class AppTheme(val displayName: String, val description: String) {
     WARM_AMBER(
         displayName = "Warm Amber Minimal",
         description = "Muted warm amber typography on deep espresso background for night focus."
+    ),
+    SLATE_DARK(
+        displayName = "Minimal Slate",
+        description = "Modern dark slate (#12151B) with muted ice-blue accents for effortless readability."
+    ),
+    CYAN_MINIMAL(
+        displayName = "Nordic Frost",
+        description = "Ultra-clean deep charcoal with crisp frosted cyan highlights."
     );
 
     companion object {

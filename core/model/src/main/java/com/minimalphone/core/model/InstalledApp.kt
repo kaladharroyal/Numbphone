@@ -26,3 +26,16 @@ data class InstalledApp(
     val lastUsedTimestamp: Long = 0L,
     val installedTimestamp: Long = 0L
 )
+
+/**
+ * Domain model for an app that has been explicitly granted emergency/essential access.
+ * These apps bypass focus restrictions and budget rules unconditionally.
+ */
+data class EssentialApp(
+    val packageName: String,
+    val label: String,
+    /** True if this was set by the system bootstrapper; false if user-added. */
+    val isSystemDefault: Boolean = false,
+    val addedTimestamp: Long = 0L
+)
+

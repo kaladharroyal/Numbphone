@@ -2,9 +2,14 @@ package com.minimalphone.feature.homescreen
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.minimalphone.core.data.repository.ContactRepository
+import com.minimalphone.core.data.repository.EssentialAppRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
+import com.minimalphone.core.data.repository.NotificationDigestRepository
 import com.minimalphone.core.domain.GetHomeAppsUseCase
 import com.minimalphone.core.domain.SyncInstalledAppsUseCase
+import com.minimalphone.core.domain.dumbmode.DumbModeManager
+import com.minimalphone.core.domain.dumbmode.LauncherPolicy
 import com.minimalphone.core.domain.friction.RecordIntentReflectionUseCase
 import com.minimalphone.core.domain.launch.LaunchAppUseCase
 import com.minimalphone.core.model.AppCategory
@@ -12,11 +17,14 @@ import com.minimalphone.core.model.AppLaunchDecision
 import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSession
 import com.minimalphone.core.model.InstalledApp
+import com.minimalphone.core.model.QuickContact
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -37,6 +45,7 @@ data class ReflectionDialogState(
 data class HomeUiState(
     val visibleApps: List<InstalledApp> = emptyList(),
     val isFocusActive: Boolean = false,
+    val isDumbMode: Boolean = false,
     val activeSession: FocusSession? = null,
     val focusGoal: String? = null,
     val remainingMinutes: Int? = null,
@@ -52,11 +61,32 @@ class HomeViewModel @Inject constructor(
     private val syncInstalledAppsUseCase: SyncInstalledAppsUseCase,
     private val launchAppUseCase: LaunchAppUseCase,
     private val focusSessionRepository: FocusSessionRepository,
-    private val recordIntentReflectionUseCase: RecordIntentReflectionUseCase
+    private val recordIntentReflectionUseCase: RecordIntentReflectionUseCase,
+    private val dumbModeManager: DumbModeManager,
+    private val launcherPolicy: LauncherPolicy,
+    private val essentialAppRepository: EssentialAppRepository,
+    private val contactRepository: ContactRepository,
+    private val digestRepository: NotificationDigestRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    val pinnedContacts: StateFlow<List<QuickContact>> =
+        contactRepository.observePinnedContacts()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyList()
+            )
+
+    val unreadDigestCount: StateFlow<Int> =
+        digestRepository.observeUnreadCount()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = 0
+            )
 
     init {
         observeState()
@@ -67,25 +97,35 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             combine(
                 getHomeAppsUseCase(),
-                focusSessionRepository.getActiveSession()
-            ) { apps, session ->
+                focusSessionRepository.getActiveSession(),
+                dumbModeManager.isDumbModeEnabled,
+                essentialAppRepository.observeEssentialPackages()
+            ) { apps, session, isDumbMode, essentialPkgs ->
                 val isActive = session != null && session.isCurrentlyActive
                 val remainingMins = if (isActive) {
                     ((session!!.remainingMillis / 60000).toInt()).coerceAtLeast(1)
                 } else null
 
-                // In STRICT and DEEP_FOCUS mode, hide managed apps from the home screen
-                val filteredApps = if (isActive &&
+                // In STRICT/DEEP_FOCUS mode, hide managed apps
+                val focusFilteredApps = if (isActive &&
                     (session!!.mode == FocusMode.STRICT || session.mode == FocusMode.DEEP_FOCUS)
                 ) {
-                    apps.filter { it.category == AppCategory.ESSENTIAL || it.isEssential }
+                    apps.filter { it.category == AppCategory.ESSENTIAL || it.isEssential || essentialPkgs.contains(it.packageName) }
                 } else {
                     apps
                 }
 
+                // Apply Dumb Mode policy filter
+                val finalApps = launcherPolicy.filterVisibleApps(
+                    apps = focusFilteredApps,
+                    isDumbMode = isDumbMode,
+                    essentialPackages = essentialPkgs
+                )
+
                 _uiState.value.copy(
-                    visibleApps = filteredApps,
+                    visibleApps = finalApps,
                     isFocusActive = isActive,
+                    isDumbMode = isDumbMode,
                     activeSession = session,
                     focusGoal = session?.goal?.title,
                     remainingMinutes = remainingMins,
@@ -101,6 +141,10 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             when (val decision = launchAppUseCase(app.packageName)) {
                 is AppLaunchDecision.Allow -> {
+                    onAllowLaunch(decision.packageName, decision.activityName)
+                }
+                is AppLaunchDecision.EmergencyAllow -> {
+                    // Emergency / essential apps always launch immediately
                     onAllowLaunch(decision.packageName, decision.activityName)
                 }
                 is AppLaunchDecision.Block -> {
@@ -124,6 +168,18 @@ class HomeViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    fun onAddContact(name: String, phoneNumber: String) {
+        viewModelScope.launch {
+            contactRepository.saveContact(name, phoneNumber, isPinned = true)
+        }
+    }
+
+    fun onDeleteContact(id: String) {
+        viewModelScope.launch {
+            contactRepository.deleteContact(id)
         }
     }
 

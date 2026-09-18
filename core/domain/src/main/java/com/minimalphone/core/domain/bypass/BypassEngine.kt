@@ -3,6 +3,7 @@ package com.minimalphone.core.domain.bypass
 import com.minimalphone.core.data.repository.AppRepository
 import com.minimalphone.core.data.repository.BlockedAttemptRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
+import com.minimalphone.core.domain.emergency.EmergencyAccessManager
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.BlockedAttempt
 import com.minimalphone.core.model.BypassDecision
@@ -12,7 +13,8 @@ import javax.inject.Inject
 
 class EvaluateBypassRouteUseCase @Inject constructor(
     private val appRepository: AppRepository,
-    private val focusSessionRepository: FocusSessionRepository
+    private val focusSessionRepository: FocusSessionRepository,
+    private val emergencyAccessManager: EmergencyAccessManager
 ) {
     suspend operator fun invoke(packageName: String): BypassDecision {
         // 1. Ignore Minimal Phone launcher itself
@@ -25,19 +27,24 @@ class EvaluateBypassRouteUseCase @Inject constructor(
             return BypassDecision.Allow
         }
 
-        // 3. Query app metadata
+        // 3. Emergency/Essential apps always bypass — check EmergencyAccessManager first
+        if (emergencyAccessManager.isEmergencyOrEssential(packageName)) {
+            return BypassDecision.Allow
+        }
+
+        // 4. Query app metadata — DB-classified essential apps also bypass
         val app = appRepository.getApp(packageName)
         if (app != null && (app.category == AppCategory.ESSENTIAL || app.isEssential)) {
             return BypassDecision.Allow
         }
 
-        // 4. Check if a Focus Session is currently active
+        // 5. Check if a Focus Session is currently active
         val activeSession = focusSessionRepository.getActiveSessionSync()
         if (activeSession == null || !activeSession.isCurrentlyActive) {
             return BypassDecision.Allow
         }
 
-        // 5. In STRICT and DEEP_FOCUS modes, intercept managed apps
+        // 6. In STRICT and DEEP_FOCUS modes, intercept managed apps
         return when (activeSession.mode) {
             FocusMode.LIGHT -> BypassDecision.Allow
             FocusMode.STRICT,
@@ -56,6 +63,7 @@ class EvaluateBypassRouteUseCase @Inject constructor(
                 packageName.startsWith("com.android.inputmethod")
     }
 }
+
 
 class RecordBypassAttemptUseCase @Inject constructor(
     private val appRepository: AppRepository,

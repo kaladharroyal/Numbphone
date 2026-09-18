@@ -2,6 +2,9 @@ package com.minimalphone.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.minimalphone.core.data.repository.AppRepository
+import com.minimalphone.core.data.repository.BudgetRepository
+import com.minimalphone.core.data.repository.EssentialAppRepository
 import com.minimalphone.core.domain.BackupExportResult
 import com.minimalphone.core.domain.BackupImportResult
 import com.minimalphone.core.domain.ExportBackupJsonUseCase
@@ -11,14 +14,22 @@ import com.minimalphone.core.domain.SetOnboardingCompletedUseCase
 import com.minimalphone.core.domain.UpdateAdaptiveFrictionUseCase
 import com.minimalphone.core.domain.UpdateAppThemeUseCase
 import com.minimalphone.core.domain.UpdateDefaultFocusDurationUseCase
+import com.minimalphone.core.domain.UpdateDumbModeUseCase
 import com.minimalphone.core.domain.UpdateLocalAnalyticsUseCase
 import com.minimalphone.core.domain.UserSettings
+import com.minimalphone.core.model.AppBudget
 import com.minimalphone.core.model.AppTheme
+import com.minimalphone.core.model.DailyAppUsage
+import com.minimalphone.core.model.EssentialApp
+import com.minimalphone.core.model.InstalledApp
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import javax.inject.Inject
 
 @HiltViewModel
@@ -28,9 +39,14 @@ class SettingsViewModel @Inject constructor(
     private val updateDefaultFocusDurationUseCase: UpdateDefaultFocusDurationUseCase,
     private val updateLocalAnalyticsUseCase: UpdateLocalAnalyticsUseCase,
     private val updateAppThemeUseCase: UpdateAppThemeUseCase,
+    private val updateDumbModeUseCase: UpdateDumbModeUseCase,
+    private val updateAutoGrayscaleInFocusUseCase: com.minimalphone.core.domain.UpdateAutoGrayscaleInFocusUseCase,
     private val setOnboardingCompletedUseCase: SetOnboardingCompletedUseCase,
     private val exportBackupJsonUseCase: ExportBackupJsonUseCase,
-    private val importBackupJsonUseCase: ImportBackupJsonUseCase
+    private val importBackupJsonUseCase: ImportBackupJsonUseCase,
+    private val essentialAppRepository: EssentialAppRepository,
+    private val budgetRepository: BudgetRepository,
+    private val appRepository: AppRepository
 ) : ViewModel() {
 
     private val _settingsState = MutableStateFlow(UserSettings())
@@ -38,6 +54,42 @@ class SettingsViewModel @Inject constructor(
 
     private val _backupStatus = MutableStateFlow<String?>(null)
     val backupStatus: StateFlow<String?> = _backupStatus.asStateFlow()
+
+    /** Live list of user-configured essential apps for the Essential Access UI. */
+    val essentialApps: StateFlow<List<EssentialApp>> =
+        essentialAppRepository.observeEssentialApps()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyList()
+            )
+
+    /** Live list of all configured budgets. */
+    val budgets: StateFlow<List<AppBudget>> =
+        budgetRepository.observeAllBudgets()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyList()
+            )
+
+    /** Live list of today's app usages. */
+    val todayUsage: StateFlow<List<DailyAppUsage>> =
+        budgetRepository.observeTodayUsage(LocalDate.now().toString())
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyList()
+            )
+
+    /** Installed apps for setting up new budgets. */
+    val allInstalledApps: StateFlow<List<InstalledApp>> =
+        appRepository.getAllApps()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyList()
+            )
 
     init {
         viewModelScope.launch {
@@ -68,6 +120,33 @@ class SettingsViewModel @Inject constructor(
     fun onSelectTheme(theme: AppTheme) {
         viewModelScope.launch {
             updateAppThemeUseCase(theme)
+        }
+    }
+
+    fun onToggleDumbMode(enabled: Boolean) {
+        viewModelScope.launch {
+            updateDumbModeUseCase(enabled)
+        }
+    }
+
+    fun onToggleAutoGrayscaleInFocus(enabled: Boolean) {
+        viewModelScope.launch {
+            updateAutoGrayscaleInFocusUseCase(enabled)
+        }
+    }
+
+    fun onSetBudget(packageName: String, label: String, limitMinutes: Int, pinToHome: Boolean = false) {
+        viewModelScope.launch {
+            budgetRepository.setBudget(packageName, label, limitMinutes)
+            if (pinToHome) {
+                appRepository.toggleFavoriteOnHome(packageName, true)
+            }
+        }
+    }
+
+    fun onRemoveBudget(packageName: String) {
+        viewModelScope.launch {
+            budgetRepository.removeBudget(packageName)
         }
     }
 
@@ -103,6 +182,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             setOnboardingCompletedUseCase(false)
             onNavigateToOnboarding()
+        }
+    }
+
+    /** Remove a user-added essential app. System defaults are protected at the DAO level. */
+    fun onRemoveEssentialApp(packageName: String) {
+        viewModelScope.launch {
+            essentialAppRepository.removeEssentialApp(packageName)
         }
     }
 }

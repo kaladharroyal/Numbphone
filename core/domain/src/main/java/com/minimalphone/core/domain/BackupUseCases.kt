@@ -1,15 +1,24 @@
 package com.minimalphone.core.domain
 
 import com.minimalphone.core.data.repository.AppRepository
+import com.minimalphone.core.data.repository.BudgetRepository
+import com.minimalphone.core.data.repository.ContactRepository
+import com.minimalphone.core.data.repository.EssentialAppRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
+import com.minimalphone.core.data.repository.ScheduleRepository
 import com.minimalphone.core.data.repository.SettingsRepository
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.AppTheme
+import com.minimalphone.core.model.FocusGoal
 import com.minimalphone.core.model.FocusMode
+import com.minimalphone.core.model.FocusSchedule
 import com.minimalphone.core.model.FocusSession
+import com.minimalphone.core.model.SessionStatus
 import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.DayOfWeek
+import java.time.LocalTime
 import java.util.UUID
 import javax.inject.Inject
 
@@ -30,7 +39,11 @@ data class BackupImportResult(
 class ExportBackupJsonUseCase @Inject constructor(
     private val appRepository: AppRepository,
     private val focusSessionRepository: FocusSessionRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val budgetRepository: BudgetRepository,
+    private val scheduleRepository: ScheduleRepository,
+    private val essentialAppRepository: EssentialAppRepository,
+    private val contactRepository: ContactRepository
 ) {
     suspend operator fun invoke(): BackupExportResult {
         val apps = appRepository.getAllApps().first()
@@ -40,9 +53,15 @@ class ExportBackupJsonUseCase @Inject constructor(
         val duration = settingsRepository.defaultFocusDurationMinutes.first()
         val analytics = settingsRepository.isLocalAnalyticsEnabled.first()
         val theme = settingsRepository.appTheme.first()
+        val dumbMode = settingsRepository.isDumbModeEnabled.first()
+
+        val budgets = budgetRepository.observeAllBudgets().first()
+        val schedules = scheduleRepository.observeSchedules().first()
+        val essentials = essentialAppRepository.observeEssentialApps().first()
+        val contacts = contactRepository.observeAllContacts().first()
 
         val root = JSONObject()
-        root.put("version", 1)
+        root.put("version", 2)
         root.put("timestamp", System.currentTimeMillis())
 
         val settingsObj = JSONObject()
@@ -51,6 +70,7 @@ class ExportBackupJsonUseCase @Inject constructor(
         settingsObj.put("defaultFocusDurationMinutes", duration)
         settingsObj.put("isLocalAnalyticsEnabled", analytics)
         settingsObj.put("appTheme", theme.name)
+        settingsObj.put("isDumbModeEnabled", dumbMode)
         root.put("settings", settingsObj)
 
         val appsArray = JSONArray()
@@ -79,6 +99,57 @@ class ExportBackupJsonUseCase @Inject constructor(
         }
         root.put("focusSessions", sessionsArray)
 
+        // Budgets (M14)
+        val budgetsArray = JSONArray()
+        budgets.forEach { b ->
+            val bObj = JSONObject()
+            bObj.put("packageName", b.packageName)
+            bObj.put("appLabel", b.appLabel)
+            bObj.put("dailyLimitMinutes", b.dailyLimitMinutes)
+            bObj.put("enabled", b.enabled)
+            budgetsArray.put(bObj)
+        }
+        root.put("budgets", budgetsArray)
+
+        // Schedules (M15)
+        val schedulesArray = JSONArray()
+        schedules.forEach { sc ->
+            val scObj = JSONObject()
+            scObj.put("id", sc.id)
+            scObj.put("title", sc.title)
+            scObj.put("daysOfWeek", sc.daysOfWeek.joinToString(",") { it.name })
+            scObj.put("startTimeHour", sc.startTime.hour)
+            scObj.put("startTimeMinute", sc.startTime.minute)
+            scObj.put("durationMinutes", sc.durationMinutes)
+            scObj.put("mode", sc.mode.name)
+            scObj.put("isEnabled", sc.isEnabled)
+            schedulesArray.put(scObj)
+        }
+        root.put("schedules", schedulesArray)
+
+        // Essential apps (M12)
+        val essentialsArray = JSONArray()
+        essentials.forEach { e ->
+            val eObj = JSONObject()
+            eObj.put("packageName", e.packageName)
+            eObj.put("label", e.label)
+            eObj.put("isSystemDefault", e.isSystemDefault)
+            essentialsArray.put(eObj)
+        }
+        root.put("essentialApps", essentialsArray)
+
+        // Quick Contacts (M20)
+        val contactsArray = JSONArray()
+        contacts.forEach { c ->
+            val cObj = JSONObject()
+            cObj.put("id", c.id)
+            cObj.put("name", c.name)
+            cObj.put("phoneNumber", c.phoneNumber)
+            cObj.put("isPinned", c.isPinned)
+            contactsArray.put(cObj)
+        }
+        root.put("quickContacts", contactsArray)
+
         val jsonString = root.toString(2)
         return BackupExportResult(
             jsonString = jsonString,
@@ -92,7 +163,11 @@ class ExportBackupJsonUseCase @Inject constructor(
 class ImportBackupJsonUseCase @Inject constructor(
     private val appRepository: AppRepository,
     private val focusSessionRepository: FocusSessionRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val budgetRepository: BudgetRepository,
+    private val scheduleRepository: ScheduleRepository,
+    private val essentialAppRepository: EssentialAppRepository,
+    private val contactRepository: ContactRepository
 ) {
     suspend operator fun invoke(jsonString: String): BackupImportResult {
         return try {
@@ -118,6 +193,9 @@ class ImportBackupJsonUseCase @Inject constructor(
             if (settingsObj.has("appTheme")) {
                 val themeName = settingsObj.getString("appTheme")
                 settingsRepository.setAppTheme(AppTheme.fromName(themeName))
+            }
+            if (settingsObj.has("isDumbModeEnabled")) {
+                settingsRepository.setDumbModeEnabled(settingsObj.getBoolean("isDumbModeEnabled"))
             }
 
             // 2. Restore App Classifications & Favorites
@@ -152,7 +230,7 @@ class ImportBackupJsonUseCase @Inject constructor(
                     val goalTitle = sObj.optString("goalTitle", sObj.optString("goal", "Focus Session"))
                     val durationMinutes = sObj.optInt("durationMinutes", sObj.optInt("targetDurationMinutes", 25))
                     val modeName = sObj.optString("mode", FocusMode.STRICT.name)
-                    val statusName = sObj.optString("status", com.minimalphone.core.model.SessionStatus.COMPLETED.name)
+                    val statusName = sObj.optString("status", SessionStatus.COMPLETED.name)
                     val startTime = sObj.optLong("startTime", System.currentTimeMillis())
                     val endTime = sObj.optLong("endTime", startTime + (durationMinutes * 60 * 1000L))
                     val frictionSecs = sObj.optInt("exitFrictionSecondsCompleted", 0)
@@ -165,9 +243,9 @@ class ImportBackupJsonUseCase @Inject constructor(
                     }
 
                     val status = try {
-                        com.minimalphone.core.model.SessionStatus.valueOf(statusName)
+                        SessionStatus.valueOf(statusName)
                     } catch (e: Exception) {
-                        com.minimalphone.core.model.SessionStatus.COMPLETED
+                        SessionStatus.COMPLETED
                     }
 
                     val session = FocusSession(
@@ -175,7 +253,7 @@ class ImportBackupJsonUseCase @Inject constructor(
                         startTime = startTime,
                         endTime = endTime,
                         durationMinutes = durationMinutes,
-                        goal = com.minimalphone.core.model.FocusGoal(
+                        goal = FocusGoal(
                             id = UUID.randomUUID().toString(),
                             title = goalTitle
                         ),
@@ -185,10 +263,65 @@ class ImportBackupJsonUseCase @Inject constructor(
                         exitFrictionSecondsCompleted = frictionSecs
                     )
                     focusSessionRepository.startSession(session)
-                    if (status == com.minimalphone.core.model.SessionStatus.COMPLETED) {
+                    if (status == SessionStatus.COMPLETED) {
                         focusSessionRepository.completeSession(id)
                     }
                     restoredSessions++
+                }
+            }
+
+            // 4. Restore Budgets
+            if (root.has("budgets")) {
+                val budgetsArray = root.getJSONArray("budgets")
+                for (i in 0 until budgetsArray.length()) {
+                    val bObj = budgetsArray.getJSONObject(i)
+                    val pkg = bObj.getString("packageName")
+                    val label = bObj.optString("appLabel", pkg)
+                    val limit = bObj.optInt("dailyLimitMinutes", 30)
+                    budgetRepository.setBudget(pkg, label, limit)
+                }
+            }
+
+            // 5. Restore Schedules
+            if (root.has("schedules")) {
+                val schedulesArray = root.getJSONArray("schedules")
+                for (i in 0 until schedulesArray.length()) {
+                    val scObj = schedulesArray.getJSONObject(i)
+                    val id = scObj.optString("id", UUID.randomUUID().toString())
+                    val title = scObj.getString("title")
+                    val daysStr = scObj.optString("daysOfWeek", "MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY")
+                    val days = daysStr.split(",")
+                        .mapNotNull { runCatching { DayOfWeek.valueOf(it.trim()) }.getOrNull() }
+                        .toSet()
+                    val hour = scObj.optInt("startTimeHour", 9)
+                    val minute = scObj.optInt("startTimeMinute", 0)
+                    val duration = scObj.optInt("durationMinutes", 60)
+                    val mode = runCatching { FocusMode.valueOf(scObj.optString("mode", FocusMode.STRICT.name)) }.getOrDefault(FocusMode.STRICT)
+                    val enabled = scObj.optBoolean("isEnabled", true)
+
+                    scheduleRepository.saveSchedule(
+                        FocusSchedule(
+                            id = id,
+                            title = title,
+                            daysOfWeek = if (days.isEmpty()) DayOfWeek.values().toSet() else days,
+                            startTime = LocalTime.of(hour, minute),
+                            durationMinutes = duration,
+                            mode = mode,
+                            isEnabled = enabled
+                        )
+                    )
+                }
+            }
+
+            // 6. Restore Quick Contacts
+            if (root.has("quickContacts")) {
+                val contactsArray = root.getJSONArray("quickContacts")
+                for (i in 0 until contactsArray.length()) {
+                    val cObj = contactsArray.getJSONObject(i)
+                    val name = cObj.getString("name")
+                    val phone = cObj.getString("phoneNumber")
+                    val isPinned = cObj.optBoolean("isPinned", true)
+                    contactRepository.saveContact(name, phone, isPinned)
                 }
             }
 

@@ -4,10 +4,12 @@ import com.minimalphone.core.data.repository.AppRepository
 import com.minimalphone.core.data.repository.BlockedAttemptRepository
 import com.minimalphone.core.data.repository.DefaultAppRepository
 import com.minimalphone.core.data.repository.DefaultBlockedAttemptRepository
+import com.minimalphone.core.data.repository.DefaultEssentialAppRepository
 import com.minimalphone.core.data.repository.DefaultExitAttemptRepository
 import com.minimalphone.core.data.repository.DefaultFocusSessionRepository
 import com.minimalphone.core.data.repository.DefaultSettingsRepository
 import com.minimalphone.core.data.repository.DefaultUsageStatsRepository
+import com.minimalphone.core.data.repository.EssentialAppRepository
 import com.minimalphone.core.data.repository.ExitAttemptRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
 import com.minimalphone.core.data.repository.SettingsRepository
@@ -57,4 +59,35 @@ object DataModule {
     fun provideSettingsRepository(
         impl: DefaultSettingsRepository
     ): SettingsRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideEssentialAppRepository(
+        impl: DefaultEssentialAppRepository
+    ): EssentialAppRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideBudgetRepository(
+        impl: com.minimalphone.core.data.repository.DefaultBudgetRepository
+    ): com.minimalphone.core.data.repository.BudgetRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideScheduleRepository(
+        impl: com.minimalphone.core.data.repository.DefaultScheduleRepository
+    ): com.minimalphone.core.data.repository.ScheduleRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideNotificationDigestRepository(
+        impl: com.minimalphone.core.data.repository.DefaultNotificationDigestRepository
+    ): com.minimalphone.core.data.repository.NotificationDigestRepository = impl
+
+    @Provides
+    @Singleton
+    fun provideContactRepository(
+        impl: com.minimalphone.core.data.repository.DefaultContactRepository
+    ): com.minimalphone.core.data.repository.ContactRepository = impl
 }
+

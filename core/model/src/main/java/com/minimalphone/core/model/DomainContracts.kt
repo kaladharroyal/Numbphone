@@ -32,7 +32,10 @@ data class ExitAttempt(
 )
 
 sealed interface AppLaunchDecision {
+    /** Normal allow — no restrictions apply. */
     data class Allow(val packageName: String, val activityName: String) : AppLaunchDecision
+    /** Emergency/Essential allow — bypasses ALL focus and budget rules. */
+    data class EmergencyAllow(val packageName: String, val activityName: String) : AppLaunchDecision
     data class Block(val packageName: String, val reason: String, val activeSession: FocusSession?) : AppLaunchDecision
     data class ShowFriction(val packageName: String, val activeSession: FocusSession, val frictionSeconds: Int) : AppLaunchDecision
 }

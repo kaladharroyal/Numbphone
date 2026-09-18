@@ -61,6 +61,32 @@ val WarmAmberColorScheme = darkColorScheme(
     outline = Color(0xFF3D332B)
 )
 
+// 4. Minimal Slate
+val SlateDarkColorScheme = darkColorScheme(
+    primary = Color(0xFF90CDF4),
+    onPrimary = Color(0xFF0D1B2A),
+    background = Color(0xFF0F172A),
+    onBackground = Color(0xFFE2E8F0),
+    surface = Color(0xFF1E293B),
+    onSurface = Color(0xFFF1F5F9),
+    surfaceVariant = Color(0xFF334155),
+    onSurfaceVariant = Color(0xFF94A3B8),
+    outline = Color(0xFF475569)
+)
+
+// 5. Nordic Frost
+val NordicFrostColorScheme = darkColorScheme(
+    primary = Color(0xFF38BDF8),
+    onPrimary = Color(0xFF082F49),
+    background = Color(0xFF0B132B),
+    onBackground = Color(0xFFE0F2FE),
+    surface = Color(0xFF1C2541),
+    onSurface = Color(0xFFF0F9FF),
+    surfaceVariant = Color(0xFF3A506B),
+    onSurfaceVariant = Color(0xFFBAE6FD),
+    outline = Color(0xFF5BC0BE)
+)
+
 val MinimalTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
@@ -119,6 +145,8 @@ fun MinimalTheme(
         AppTheme.PURE_BLACK -> PureBlackColorScheme
         AppTheme.E_INK_PAPER -> EInkPaperColorScheme
         AppTheme.WARM_AMBER -> WarmAmberColorScheme
+        AppTheme.SLATE_DARK -> SlateDarkColorScheme
+        AppTheme.CYAN_MINIMAL -> NordicFrostColorScheme
     }
 
     MaterialTheme(

@@ -1,6 +1,3 @@
-
-
-
 package com.minimalphone.feature.focussession
 
 import androidx.compose.foundation.background
@@ -26,7 +23,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.Alarm
+import androidx.compose.material.icons.outlined.FlashOn
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,13 +35,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -52,8 +59,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.minimalphone.core.model.FocusGoal
 import com.minimalphone.core.model.FocusMode
-
+import com.minimalphone.core.model.FocusPreset
+import com.minimalphone.core.model.FocusSchedule
 import com.minimalphone.core.ui.components.ExitFrictionDialog
+import java.time.DayOfWeek
+import java.time.LocalTime
+import java.util.UUID
 
 @Composable
 fun FocusSessionScreen(
@@ -61,6 +72,8 @@ fun FocusSessionScreen(
     viewModel: FocusSessionViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val presets by viewModel.presets.collectAsStateWithLifecycle()
+    val schedules by viewModel.schedules.collectAsStateWithLifecycle()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -91,10 +104,16 @@ fun FocusSessionScreen(
         } else {
             SetupFocusSessionContent(
                 uiState = uiState,
+                presets = presets,
+                schedules = schedules,
                 onNavigateBack = onNavigateBack,
                 onSelectDuration = viewModel::onSelectDuration,
                 onSelectMode = viewModel::onSelectMode,
                 onSelectGoal = viewModel::onSelectGoal,
+                onSelectPreset = viewModel::onSelectPreset,
+                onToggleSchedule = viewModel::onToggleSchedule,
+                onSaveSchedule = viewModel::onSaveSchedule,
+                onDeleteSchedule = viewModel::onDeleteSchedule,
                 onSelectCustomGoal = viewModel::onSelectCustomGoal,
                 onCustomGoalTextChanged = viewModel::onCustomGoalTextChanged,
                 onStartSession = viewModel::onStartFocusSession,
@@ -110,14 +129,13 @@ private fun ActiveFocusSessionContent(
     onNavigateBack: () -> Unit,
     onEndSession: () -> Unit
 ) {
-    val session = uiState.activeSession
     val ticker = uiState.ticker
+    val session = uiState.activeSession
     val goalTitle = session?.goal?.title ?: "Focus Session"
     val modeName = when (session?.mode) {
-        FocusMode.LIGHT -> "LIGHT FOCUS"
-        FocusMode.STRICT -> "STRICT FOCUS"
+        FocusMode.LIGHT -> "LIGHT MODE"
         FocusMode.DEEP_FOCUS -> "DEEP FOCUS"
-        null -> "FOCUS ACTIVE"
+        else -> "STRICT MODE"
     }
 
     Column(
@@ -128,7 +146,7 @@ private fun ActiveFocusSessionContent(
             .padding(horizontal = 24.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Top Bar
+        // Top row
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -136,16 +154,16 @@ private fun ActiveFocusSessionContent(
             IconButton(onClick = onNavigateBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back to Home",
+                    contentDescription = "Minimize to Home",
                     tint = MaterialTheme.colorScheme.onBackground
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "ACTIVE SESSION",
+                text = "ACTIVE FOCUS SESSION",
                 style = MaterialTheme.typography.titleMedium.copy(
-                    letterSpacing = 2.sp,
-                    fontWeight = FontWeight.SemiBold
+                    letterSpacing = 1.5.sp,
+                    fontWeight = FontWeight.Bold
                 ),
                 color = MaterialTheme.colorScheme.onBackground
             )
@@ -260,16 +278,23 @@ private fun ActiveFocusSessionContent(
 @Composable
 private fun SetupFocusSessionContent(
     uiState: FocusSessionUiState,
+    presets: List<FocusPreset>,
+    schedules: List<FocusSchedule>,
     onNavigateBack: () -> Unit,
     onSelectDuration: (Int) -> Unit,
     onSelectMode: (FocusMode) -> Unit,
     onSelectGoal: (FocusGoal) -> Unit,
+    onSelectPreset: (FocusPreset) -> Unit,
+    onToggleSchedule: (String, Boolean) -> Unit,
+    onSaveSchedule: (FocusSchedule) -> Unit,
+    onDeleteSchedule: (String) -> Unit,
     onSelectCustomGoal: () -> Unit,
     onCustomGoalTextChanged: (String) -> Unit,
     onStartSession: () -> Unit,
     onDismissError: () -> Unit
 ) {
     val scrollState = rememberScrollState()
+    var showAddScheduleDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -309,7 +334,59 @@ private fun SetupFocusSessionContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(28.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // SECTION 0: ONE-TAP PRESETS
+        if (presets.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.FlashOn,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "QUICK FOCUS PRESETS",
+                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                presets.forEach { preset ->
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.06f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.18f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .clickable { onSelectPreset(preset) }
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "${preset.title} • ${preset.durationMinutes}m",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+        }
 
         // SECTION 1: GOAL SELECTION
         Text(
@@ -429,6 +506,95 @@ private fun SetupFocusSessionContent(
             onClick = { onSelectMode(FocusMode.DEEP_FOCUS) }
         )
 
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // SECTION 4: RECURRING SCHEDULES
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Alarm,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = "RECURRING SCHEDULES",
+                    style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                )
+            }
+
+            IconButton(onClick = { showAddScheduleDialog = true }, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add Schedule",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (schedules.isEmpty()) {
+            Text(
+                text = "No automated schedules yet. Tap + to set a recurring focus window (e.g. Work 9am-5pm).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+            )
+        } else {
+            schedules.forEach { schedule ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                        .padding(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = schedule.title,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "${schedule.startTime} (${schedule.durationMinutes}m) • ${schedule.daysOfWeek.joinToString { it.name.take(3) }}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Switch(
+                                checked = schedule.isEnabled,
+                                onCheckedChange = { onToggleSchedule(schedule.id, it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            TextButton(onClick = { onDeleteSchedule(schedule.id) }) {
+                                Text("✕", color = Color(0xFFFF453A))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Error message if any
         if (uiState.errorMessage != null) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -472,6 +638,100 @@ private fun SetupFocusSessionContent(
         }
         Spacer(modifier = Modifier.height(16.dp))
     }
+
+    if (showAddScheduleDialog) {
+        AddScheduleDialog(
+            onDismiss = { showAddScheduleDialog = false },
+            onConfirm = { schedule ->
+                onSaveSchedule(schedule)
+                showAddScheduleDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun AddScheduleDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (FocusSchedule) -> Unit
+) {
+    var title by remember { mutableStateOf("Work Hours Focus") }
+    var hour by remember { mutableStateOf(9) }
+    var minute by remember { mutableStateOf(0) }
+    var durationMinutes by remember { mutableStateOf(60) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                text = "New Focus Schedule",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Schedule Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = hour.toString(),
+                        onValueChange = { hour = it.toIntOrNull()?.coerceIn(0, 23) ?: 0 },
+                        label = { Text("Hour (0-23)") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = minute.toString(),
+                        onValueChange = { minute = it.toIntOrNull()?.coerceIn(0, 59) ?: 0 },
+                        label = { Text("Min (0-59)") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                OutlinedTextField(
+                    value = durationMinutes.toString(),
+                    onValueChange = { durationMinutes = it.toIntOrNull()?.coerceIn(15, 720) ?: 60 },
+                    label = { Text("Duration (minutes)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        val schedule = FocusSchedule(
+                            id = "sched_${UUID.randomUUID()}",
+                            title = title.trim(),
+                            daysOfWeek = setOf(DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY, DayOfWeek.FRIDAY),
+                            startTime = LocalTime.of(hour, minute),
+                            durationMinutes = durationMinutes,
+                            mode = FocusMode.STRICT,
+                            isEnabled = true
+                        )
+                        onConfirm(schedule)
+                    }
+                }
+            ) {
+                Text("Save Schedule")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable

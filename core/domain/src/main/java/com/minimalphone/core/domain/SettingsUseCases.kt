@@ -11,7 +11,9 @@ data class UserSettings(
     val isAdaptiveFrictionEnabled: Boolean = true,
     val defaultFocusDurationMinutes: Int = 25,
     val isLocalAnalyticsEnabled: Boolean = true,
-    val appTheme: AppTheme = AppTheme.PURE_BLACK
+    val appTheme: AppTheme = AppTheme.PURE_BLACK,
+    val isDumbModeEnabled: Boolean = false,
+    val isAutoGrayscaleInFocusEnabled: Boolean = false
 )
 
 class GetSettingsUseCase @Inject constructor(
@@ -23,14 +25,20 @@ class GetSettingsUseCase @Inject constructor(
             settingsRepository.isAdaptiveFrictionEnabled,
             settingsRepository.defaultFocusDurationMinutes,
             settingsRepository.isLocalAnalyticsEnabled,
-            settingsRepository.appTheme
-        ) { onboarding, adaptive, duration, analytics, theme ->
+            combine(
+                settingsRepository.appTheme,
+                settingsRepository.isDumbModeEnabled,
+                settingsRepository.isAutoGrayscaleInFocusEnabled
+            ) { theme, dumbMode, autoGrayscale -> Triple(theme, dumbMode, autoGrayscale) }
+        ) { onboarding, adaptive, duration, analytics, triple ->
             UserSettings(
                 isOnboardingCompleted = onboarding,
                 isAdaptiveFrictionEnabled = adaptive,
                 defaultFocusDurationMinutes = duration,
                 isLocalAnalyticsEnabled = analytics,
-                appTheme = theme
+                appTheme = triple.first,
+                isDumbModeEnabled = triple.second,
+                isAutoGrayscaleInFocusEnabled = triple.third
             )
         }
     }
@@ -73,5 +81,21 @@ class UpdateAppThemeUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(theme: AppTheme) {
         settingsRepository.setAppTheme(theme)
+    }
+}
+
+class UpdateDumbModeUseCase @Inject constructor(
+    private val settingsRepository: SettingsRepository
+) {
+    suspend operator fun invoke(enabled: Boolean) {
+        settingsRepository.setDumbModeEnabled(enabled)
+    }
+}
+
+class UpdateAutoGrayscaleInFocusUseCase @Inject constructor(
+    private val settingsRepository: SettingsRepository
+) {
+    suspend operator fun invoke(enabled: Boolean) {
+        settingsRepository.setAutoGrayscaleInFocusEnabled(enabled)
     }
 }

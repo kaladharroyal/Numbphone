@@ -30,13 +30,19 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.LocalPhone
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Upload
+import androidx.compose.material.icons.outlined.HourglassTop
+import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -59,7 +65,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.minimalphone.core.model.AppBudget
 import com.minimalphone.core.model.AppTheme
+import com.minimalphone.core.model.DailyAppUsage
+import com.minimalphone.core.model.InstalledApp
 import com.minimalphone.core.ui.theme.MutedText
 
 @Composable
@@ -72,11 +81,16 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
     val backupStatus by viewModel.backupStatus.collectAsStateWithLifecycle()
+    val essentialApps by viewModel.essentialApps.collectAsStateWithLifecycle()
+    val budgets by viewModel.budgets.collectAsStateWithLifecycle()
+    val todayUsage by viewModel.todayUsage.collectAsStateWithLifecycle()
+    val allInstalledApps by viewModel.allInstalledApps.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var showImportDialog by remember { mutableStateOf(false) }
     var importJsonText by remember { mutableStateOf("") }
     var importErrorText by remember { mutableStateOf<String?>(null) }
+    var showAddBudgetDialog by remember { mutableStateOf(false) }
 
     val feedbackFormUrl = "https://forms.gle/T3xsTRHTx2uDaoVP6"
 
@@ -209,6 +223,32 @@ fun SettingsScreen(
                     )
                 }
 
+                // Section 3b: Dumb Phone Detox Mode
+                item {
+                    SectionHeader(title = "DUMB PHONE MODE (EXTREME DETOX)")
+                }
+
+                item {
+                    SettingToggleCard(
+                        title = "Dumb Phone Mode",
+                        description = "Hides all managed apps and games from your home screen. Only essential communication tools (Phone, SMS) and whitelisted essentials stay visible.",
+                        isChecked = settings.isDumbModeEnabled,
+                        onCheckedChange = { viewModel.onToggleDumbMode(it) }
+                    )
+                }
+
+                // Section 3c: Hardware Grayscale (M22)
+                item {
+                    SectionHeader(title = "HARDWARE GRAYSCALE & COLOR DETOX")
+                }
+
+                item {
+                    GrayscaleControlCard(
+                        isAutoGrayscaleInFocus = settings.isAutoGrayscaleInFocusEnabled,
+                        onToggleAutoGrayscale = { viewModel.onToggleAutoGrayscaleInFocus(it) }
+                    )
+                }
+
                 // Section 4: Applications & Whitelist
                 item {
                     SectionHeader(title = "APPLICATIONS")
@@ -219,6 +259,33 @@ fun SettingsScreen(
                         title = "App Whitelist & Rules",
                         subtitle = "Classify apps as Essential or Managed with instant quick-search.",
                         onClick = onNavigateToAppsManagement
+                    )
+                }
+
+                // Section 4b: Daily App Budgets
+                item {
+                    SectionHeader(title = "DAILY APP USAGE LIMITS")
+                }
+
+                item {
+                    DailyAppBudgetsCard(
+                        budgets = budgets,
+                        todayUsage = todayUsage,
+                        installedApps = allInstalledApps,
+                        onAddBudgetClick = { showAddBudgetDialog = true },
+                        onRemoveBudget = { pkg -> viewModel.onRemoveBudget(pkg) }
+                    )
+                }
+
+                // Section 4c: Essential Access
+                item {
+                    SectionHeader(title = "EMERGENCY & ESSENTIAL ACCESS")
+                }
+
+                item {
+                    EssentialAccessCard(
+                        essentialApps = essentialApps,
+                        onRemove = { pkg -> viewModel.onRemoveEssentialApp(pkg) }
                     )
                 }
 
@@ -370,6 +437,17 @@ fun SettingsScreen(
         )
     }
 
+    if (showAddBudgetDialog) {
+        AddBudgetDialog(
+            installedApps = allInstalledApps,
+            onDismiss = { showAddBudgetDialog = false },
+            onConfirm = { pkg, label, limitMinutes, pinToHome ->
+                viewModel.onSetBudget(pkg, label, limitMinutes, pinToHome)
+                showAddBudgetDialog = false
+            }
+        )
+    }
+
 }
 
 @Composable
@@ -415,6 +493,117 @@ private fun DndControlCard(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Enable", fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GrayscaleControlCard(
+    isAutoGrayscaleInFocus: Boolean,
+    onToggleAutoGrayscale: (Boolean) -> Unit
+) {
+    val context = LocalContext.current
+    var isGrayscaleActive by remember {
+        mutableStateOf(com.minimalphone.core.common.GrayscaleHelper.isGrayscaleEnabled(context))
+    }
+    val hasPermission = remember {
+        com.minimalphone.core.common.GrayscaleHelper.hasSecureSettingsPermission(context)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "System Monochromacy (Grayscale)",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Drains color from your entire phone display to make feeds and addictive apps visually unrewarding.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MutedText
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Switch(
+                checked = isGrayscaleActive,
+                onCheckedChange = { enable ->
+                    if (hasPermission) {
+                        val success = com.minimalphone.core.common.GrayscaleHelper.setGrayscaleEnabled(context, enable)
+                        if (success) isGrayscaleActive = enable
+                    } else {
+                        com.minimalphone.core.common.GrayscaleHelper.openColorCorrectionSettings(context)
+                        Toast.makeText(context, "Select 'Color correction' -> 'Grayscale'", Toast.LENGTH_LONG).show()
+                    }
+                },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                )
+            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Auto-Grayscale during Focus Sessions",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Automatically enables system monochrome when starting a focus session and restores color upon completion.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MutedText
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Switch(
+                checked = isAutoGrayscaleInFocus,
+                onCheckedChange = onToggleAutoGrayscale,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.primary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                )
+            )
+        }
+
+        if (!hasPermission) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                    .padding(10.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Automated Switching via ADB (Optional)",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Run this one-time command on PC for instant automatic toggle:\n${com.minimalphone.core.common.GrayscaleHelper.ADB_PERMISSION_COMMAND}",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        color = MutedText
+                    )
                 }
             }
         }
@@ -778,9 +967,424 @@ private fun PrivacyCharterCard() {
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            text = "Version 1.1.0 • Release Ready",
+            text = "Version 1.2.0 • Phase 2",
             style = MaterialTheme.typography.labelSmall,
             color = MutedText
         )
     }
 }
+
+/**
+ * Displays the list of essential apps that bypass ALL focus restrictions.
+ * System defaults (Phone, Messages, Camera, etc.) are shown with a shield badge and cannot be removed.
+ * User-added entries can be removed via the ✕ button.
+ */
+@Composable
+private fun EssentialAccessCard(
+    essentialApps: List<com.minimalphone.core.model.EssentialApp>,
+    onRemove: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Shield,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = androidx.compose.ui.Modifier.size(18.dp)
+            )
+            Text(
+                text = "Essential Apps — Always Allowed",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        Text(
+            text = "These apps bypass all focus restrictions and budget rules unconditionally. Phone, Messages and other core services are set by default and cannot be removed.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MutedText,
+            lineHeight = 18.sp
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        if (essentialApps.isEmpty()) {
+            Text(
+                text = "No essential apps configured yet. Launch the app to auto-detect defaults.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedText
+            )
+        } else {
+            essentialApps.forEach { app ->
+                Row(
+                    modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = androidx.compose.ui.Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.LocalPhone,
+                            contentDescription = null,
+                            tint = MutedText,
+                            modifier = androidx.compose.ui.Modifier.size(16.dp)
+                        )
+                        Column {
+                            Text(
+                                text = app.label,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (app.isSystemDefault) {
+                                Text(
+                                    text = "System default",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                    if (!app.isSystemDefault) {
+                        TextButton(
+                            onClick = { onRemove(app.packageName) }
+                        ) {
+                            Text(
+                                text = "Remove",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFFFF453A)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Displays user-defined daily app usage limits and current daily consumption.
+ */
+@Composable
+private fun DailyAppBudgetsCard(
+    budgets: List<AppBudget>,
+    todayUsage: List<DailyAppUsage>,
+    installedApps: List<InstalledApp> = emptyList(),
+    onAddBudgetClick: () -> Unit,
+    onRemoveBudget: (String) -> Unit
+) {
+    val usageMap = remember(todayUsage) { todayUsage.associateBy { it.packageName } }
+    val appsMap = remember(installedApps) { installedApps.associateBy { it.packageName } }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.HourglassTop,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = "Daily App Budgets",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            IconButton(onClick = onAddBudgetClick, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    imageVector = Icons.Outlined.Add,
+                    contentDescription = "Add Budget",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        Text(
+            text = "Set hard daily limits. Once an app reaches its budget today, it is strictly blocked until midnight.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MutedText,
+            lineHeight = 18.sp
+        )
+
+        if (budgets.isEmpty()) {
+            Text(
+                text = "No app budgets active. Tap + above to set a limit for distracting apps.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MutedText
+            )
+        } else {
+            budgets.forEach { budget ->
+                val used = usageMap[budget.packageName]?.foregroundMinutes ?: 0
+                val progress = if (budget.dailyLimitMinutes > 0) {
+                    (used.toFloat() / budget.dailyLimitMinutes).coerceIn(0f, 1f)
+                } else 0f
+                val isExceeded = used >= budget.dailyLimitMinutes
+                val displayName = appsMap[budget.packageName]?.label ?: budget.appLabel.ifBlank { budget.packageName }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = displayName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "${used}m / ${budget.dailyLimitMinutes}m",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isExceeded) Color(0xFFFF453A) else MutedText
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TextButton(
+                                onClick = { onRemoveBudget(budget.packageName) },
+                                modifier = Modifier.height(24.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(
+                                    text = "✕",
+                                    color = Color(0xFFFF453A),
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+                        }
+                    }
+
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp),
+                        color = if (isExceeded) Color(0xFFFF453A) else MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Dialog to configure a daily time budget for a selected installed app.
+ */
+@Composable
+private fun AddBudgetDialog(
+    installedApps: List<InstalledApp>,
+    onDismiss: () -> Unit,
+    onConfirm: (packageName: String, appLabel: String, limitMinutes: Int, pinToHome: Boolean) -> Unit
+) {
+    var selectedPkg by remember { mutableStateOf(installedApps.firstOrNull()?.packageName ?: "") }
+    var limitMinutes by remember { mutableStateOf(30) }
+    var pinToHome by remember { mutableStateOf(true) }
+    val presetDurations = listOf(15, 30, 45, 60, 90, 120)
+
+    val selectedApp = installedApps.find { it.packageName == selectedPkg }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                text = "Set Daily App Limit",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text(
+                    text = "Select an app and set its maximum allowed daily usage:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MutedText
+                )
+
+                // App picker (simplified selection row)
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp)
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                        .padding(4.dp)
+                ) {
+                    items(installedApps.size) { idx ->
+                        val app = installedApps[idx]
+                        val isSelected = app.packageName == selectedPkg
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedPkg = app.packageName }
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                    else Color.Transparent,
+                                    RoundedCornerShape(4.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = app.label,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Text(
+                    text = "Daily Limit Duration:",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    presetDurations.take(3).forEach { mins ->
+                        val isSelected = limitMinutes == mins
+                        OutlinedButton(
+                            onClick = { limitMinutes = mins },
+                            modifier = Modifier.weight(1f),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                            ),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent
+                            )
+                        ) {
+                            Text("${mins}m", fontSize = 12.sp, color = if (isSelected) MaterialTheme.colorScheme.primary else MutedText)
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    presetDurations.drop(3).forEach { mins ->
+                        val isSelected = limitMinutes == mins
+                        OutlinedButton(
+                            onClick = { limitMinutes = mins },
+                            modifier = Modifier.weight(1f),
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                            ),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent
+                            )
+                        ) {
+                            Text("${mins}m", fontSize = 12.sp, color = if (isSelected) MaterialTheme.colorScheme.primary else MutedText)
+                        }
+                    }
+                }
+
+                // Show on Home Screen Checkbox / Switch
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { pinToHome = !pinToHome }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Show on Home Screen",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Pin this app to your launcher home page.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MutedText
+                        )
+                    }
+                    Switch(
+                        checked = pinToHome,
+                        onCheckedChange = { pinToHome = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.primary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+                        )
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (selectedPkg.isNotBlank()) {
+                        onConfirm(selectedPkg, selectedApp?.label ?: selectedPkg, limitMinutes, pinToHome)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            ) {
+                Text("Set Limit")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = MutedText)
+            }
+        }
+    )
+}
+
+

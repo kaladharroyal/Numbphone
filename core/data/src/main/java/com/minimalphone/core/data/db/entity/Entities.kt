@@ -82,3 +82,104 @@ data class FocusGoalEntity(
     val usageCount: Int = 1,
     val lastUsedTimestamp: Long = System.currentTimeMillis()
 )
+
+/**
+ * Stores user-configured essential packages.
+ * These bypass all focus restrictions and budget rules.
+ * System-level emergency packages are hardcoded in EmergencyAccessManager
+ * and never stored in the database.
+ */
+@Entity(tableName = "essential_apps")
+data class EssentialAppEntity(
+    @PrimaryKey val packageName: String,
+    /** Human-readable label for display in the Essential Access settings UI. */
+    val label: String,
+    /** Whether this entry was added by the system bootstrapper (true) or the user (false). */
+    val isSystemDefault: Boolean = false,
+    val addedTimestamp: Long = System.currentTimeMillis()
+)
+
+// ─────────── M14: Daily App Budgets ───────────
+
+/**
+ * User-defined daily usage limit per app.
+ * When the app's foreground time today exceeds [dailyLimitMinutes], the RuleEngine blocks it.
+ */
+@Entity(tableName = "app_budgets")
+data class AppBudgetEntity(
+    @PrimaryKey val packageName: String,
+    /** 0 = disabled. Positive value = daily limit in minutes. */
+    val dailyLimitMinutes: Int,
+    val enabled: Boolean = true,
+    val createdTimestamp: Long = System.currentTimeMillis()
+)
+
+/**
+ * Tracks how long each app was used on a given calendar day.
+ * Populated by a background sync from UsageStatsManager each time the RuleEngine evaluates.
+ */
+@Entity(tableName = "daily_app_usage", primaryKeys = ["packageName", "date"])
+data class DailyAppUsageEntity(
+    val packageName: String,
+    /** ISO-8601 calendar date, e.g. "2026-09-18". */
+    val date: String,
+    val foregroundMinutes: Int = 0,
+    val launchCount: Int = 0,
+    val blockedAttempts: Int = 0,
+    val lastUpdatedTimestamp: Long = System.currentTimeMillis()
+)
+
+// ─────────── M15: Scheduled Focus + Presets ───────────
+
+@Entity(tableName = "focus_presets")
+data class FocusPresetEntity(
+    @PrimaryKey val id: String,
+    val title: String,
+    val durationMinutes: Int,
+    val mode: FocusMode,
+    val category: String,
+    val isDefault: Boolean = false
+)
+
+@Entity(tableName = "focus_schedules")
+data class FocusScheduleEntity(
+    @PrimaryKey val id: String,
+    val presetId: String? = null,
+    val title: String,
+    /** Comma-separated DayOfWeek names, e.g. "MONDAY,TUESDAY,WEDNESDAY" */
+    val daysOfWeek: String,
+    val startTimeHour: Int,
+    val startTimeMinute: Int,
+    val durationMinutes: Int,
+    val mode: FocusMode,
+    val isEnabled: Boolean = true
+)
+
+// ─────────── M17: Notification Digest ───────────
+
+@Entity(tableName = "digest_notifications")
+data class DigestNotificationEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    val packageName: String,
+    val appLabel: String,
+    val title: String?,
+    val text: String?,
+    val timestamp: Long = System.currentTimeMillis(),
+    val isRead: Boolean = false
+)
+
+// ─────────── M20: Quick Contacts ───────────
+
+@Entity(tableName = "quick_contacts")
+data class QuickContactEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val phoneNumber: String,
+    val isPinned: Boolean = true,
+    val addedTimestamp: Long = System.currentTimeMillis()
+)
+
+
+
+
+

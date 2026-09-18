@@ -2,19 +2,30 @@ package com.minimalphone.feature.homescreen
 
 import com.minimalphone.core.data.repository.AppRepository
 import com.minimalphone.core.data.repository.BlockedAttemptRepository
+import com.minimalphone.core.data.repository.ContactRepository
+import com.minimalphone.core.data.repository.EssentialAppRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
+import com.minimalphone.core.data.repository.NotificationDigestRepository
 import com.minimalphone.core.domain.GetHomeAppsUseCase
 import com.minimalphone.core.domain.SyncInstalledAppsUseCase
+import com.minimalphone.core.domain.dumbmode.DumbModeManager
+import com.minimalphone.core.domain.dumbmode.LauncherPolicy
+import com.minimalphone.core.domain.emergency.EmergencyAccessManager
 import com.minimalphone.core.domain.friction.RecordIntentReflectionUseCase
 import com.minimalphone.core.domain.launch.EvaluateAppLaunchUseCase
 import com.minimalphone.core.domain.launch.LaunchAppUseCase
+import com.minimalphone.core.domain.rules.RuleEngine
 import com.minimalphone.core.model.AppCategory
+import com.minimalphone.core.model.AppLaunchDecision
 import com.minimalphone.core.model.BlockedAttempt
 import com.minimalphone.core.model.FocusGoal
 import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSession
 import com.minimalphone.core.model.InstalledApp
 import com.minimalphone.core.model.SessionStatus
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -98,25 +109,55 @@ class HomeViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
+    private fun createViewModel(
+        fakeRepo: FakeHomeAppRepository,
+        fakeSessionRepo: FakeHomeFocusSessionRepository,
+        fakeBlockedRepo: FakeHomeBlockedAttemptRepository,
+        ruleEngine: RuleEngine = mockk(relaxed = true)
+    ): HomeViewModel {
+        val getHomeAppsUseCase = GetHomeAppsUseCase(fakeRepo)
+        val syncInstalledAppsUseCase = SyncInstalledAppsUseCase(fakeRepo)
+        val emergencyAccessManager = mockk<EmergencyAccessManager>(relaxed = true)
+        coEvery { emergencyAccessManager.isEmergencyOrEssential("com.google.android.dialer") } returns true
+
+        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo, emergencyAccessManager, ruleEngine)
+        val launchAppUseCase = LaunchAppUseCase(evaluateAppLaunchUseCase, fakeRepo, fakeBlockedRepo)
+        val recordIntentReflectionUseCase = RecordIntentReflectionUseCase(fakeBlockedRepo)
+
+        val dumbModeManager = mockk<DumbModeManager>(relaxed = true)
+        every { dumbModeManager.isDumbModeEnabled } returns MutableStateFlow(false)
+
+        val launcherPolicy = LauncherPolicy()
+        val essentialAppRepository = mockk<EssentialAppRepository>(relaxed = true)
+        every { essentialAppRepository.observeEssentialPackages() } returns MutableStateFlow(emptySet())
+
+        val contactRepository = mockk<ContactRepository>(relaxed = true)
+        every { contactRepository.observePinnedContacts() } returns MutableStateFlow(emptyList())
+
+        val digestRepository = mockk<NotificationDigestRepository>(relaxed = true)
+        every { digestRepository.observeUnreadCount() } returns MutableStateFlow(0)
+
+        return HomeViewModel(
+            getHomeAppsUseCase = getHomeAppsUseCase,
+            syncInstalledAppsUseCase = syncInstalledAppsUseCase,
+            launchAppUseCase = launchAppUseCase,
+            focusSessionRepository = fakeSessionRepo,
+            recordIntentReflectionUseCase = recordIntentReflectionUseCase,
+            dumbModeManager = dumbModeManager,
+            launcherPolicy = launcherPolicy,
+            essentialAppRepository = essentialAppRepository,
+            contactRepository = contactRepository,
+            digestRepository = digestRepository
+        )
+    }
+
     @Test
     fun `initial uiState observes home apps flow and focus session`() {
         val fakeRepo = FakeHomeAppRepository()
         val fakeSessionRepo = FakeHomeFocusSessionRepository()
         val fakeBlockedRepo = FakeHomeBlockedAttemptRepository()
 
-        val getHomeAppsUseCase = GetHomeAppsUseCase(fakeRepo)
-        val syncInstalledAppsUseCase = SyncInstalledAppsUseCase(fakeRepo)
-        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo)
-        val launchAppUseCase = LaunchAppUseCase(evaluateAppLaunchUseCase, fakeRepo, fakeBlockedRepo)
-        val recordIntentReflectionUseCase = RecordIntentReflectionUseCase(fakeBlockedRepo)
-
-        val viewModel = HomeViewModel(
-            getHomeAppsUseCase,
-            syncInstalledAppsUseCase,
-            launchAppUseCase,
-            fakeSessionRepo,
-            recordIntentReflectionUseCase
-        )
+        val viewModel = createViewModel(fakeRepo, fakeSessionRepo, fakeBlockedRepo)
 
         val state = viewModel.uiState.value
         assertEquals(2, state.visibleApps.size)
@@ -142,19 +183,7 @@ class HomeViewModelTest {
         fakeSessionRepo.activeSession = activeSession
         fakeSessionRepo.sessionFlow.value = activeSession
 
-        val getHomeAppsUseCase = GetHomeAppsUseCase(fakeRepo)
-        val syncInstalledAppsUseCase = SyncInstalledAppsUseCase(fakeRepo)
-        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo)
-        val launchAppUseCase = LaunchAppUseCase(evaluateAppLaunchUseCase, fakeRepo, fakeBlockedRepo)
-        val recordIntentReflectionUseCase = RecordIntentReflectionUseCase(fakeBlockedRepo)
-
-        val viewModel = HomeViewModel(
-            getHomeAppsUseCase,
-            syncInstalledAppsUseCase,
-            launchAppUseCase,
-            fakeSessionRepo,
-            recordIntentReflectionUseCase
-        )
+        val viewModel = createViewModel(fakeRepo, fakeSessionRepo, fakeBlockedRepo)
 
         val state = viewModel.uiState.value
         assertTrue(state.isFocusActive)
@@ -180,19 +209,14 @@ class HomeViewModelTest {
         fakeSessionRepo.activeSession = activeSession
         fakeSessionRepo.sessionFlow.value = activeSession
 
-        val getHomeAppsUseCase = GetHomeAppsUseCase(fakeRepo)
-        val syncInstalledAppsUseCase = SyncInstalledAppsUseCase(fakeRepo)
-        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo)
-        val launchAppUseCase = LaunchAppUseCase(evaluateAppLaunchUseCase, fakeRepo, fakeBlockedRepo)
-        val recordIntentReflectionUseCase = RecordIntentReflectionUseCase(fakeBlockedRepo)
-
-        val viewModel = HomeViewModel(
-            getHomeAppsUseCase,
-            syncInstalledAppsUseCase,
-            launchAppUseCase,
-            fakeSessionRepo,
-            recordIntentReflectionUseCase
+        val ruleEngine = mockk<RuleEngine>()
+        coEvery { ruleEngine.evaluate(any()) } returns AppLaunchDecision.Block(
+            packageName = "com.google.android.youtube",
+            reason = "Focus active",
+            activeSession = activeSession
         )
+
+        val viewModel = createViewModel(fakeRepo, fakeSessionRepo, fakeBlockedRepo, ruleEngine)
 
         var didAllowLaunch = false
         val youtube = InstalledApp(
@@ -234,19 +258,14 @@ class HomeViewModelTest {
         fakeSessionRepo.activeSession = activeSession
         fakeSessionRepo.sessionFlow.value = activeSession
 
-        val getHomeAppsUseCase = GetHomeAppsUseCase(fakeRepo)
-        val syncInstalledAppsUseCase = SyncInstalledAppsUseCase(fakeRepo)
-        val evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(fakeRepo, fakeSessionRepo)
-        val launchAppUseCase = LaunchAppUseCase(evaluateAppLaunchUseCase, fakeRepo, fakeBlockedRepo)
-        val recordIntentReflectionUseCase = RecordIntentReflectionUseCase(fakeBlockedRepo)
-
-        val viewModel = HomeViewModel(
-            getHomeAppsUseCase,
-            syncInstalledAppsUseCase,
-            launchAppUseCase,
-            fakeSessionRepo,
-            recordIntentReflectionUseCase
+        val ruleEngine = mockk<RuleEngine>()
+        coEvery { ruleEngine.evaluate(any()) } returns AppLaunchDecision.ShowFriction(
+            packageName = "com.google.android.youtube",
+            activeSession = activeSession,
+            frictionSeconds = 5
         )
+
+        val viewModel = createViewModel(fakeRepo, fakeSessionRepo, fakeBlockedRepo, ruleEngine)
 
         val youtube = InstalledApp(
             packageName = "com.google.android.youtube",

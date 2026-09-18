@@ -18,12 +18,16 @@ class FakeSettingsRepository : SettingsRepository {
     val defaultDurationFlow = MutableStateFlow(25)
     val localAnalyticsFlow = MutableStateFlow(true)
     val appThemeFlow = MutableStateFlow(AppTheme.PURE_BLACK)
+    val dumbModeFlow = MutableStateFlow(false)
+    val autoGrayscaleFlow = MutableStateFlow(false)
 
     override val isOnboardingCompleted: Flow<Boolean> = onboardingFlow
     override val isAdaptiveFrictionEnabled: Flow<Boolean> = adaptiveFrictionFlow
     override val defaultFocusDurationMinutes: Flow<Int> = defaultDurationFlow
     override val isLocalAnalyticsEnabled: Flow<Boolean> = localAnalyticsFlow
     override val appTheme: Flow<AppTheme> = appThemeFlow
+    override val isDumbModeEnabled: Flow<Boolean> = dumbModeFlow
+    override val isAutoGrayscaleInFocusEnabled: Flow<Boolean> = autoGrayscaleFlow
 
     override suspend fun setOnboardingCompleted(completed: Boolean) {
         onboardingFlow.value = completed
@@ -43,6 +47,14 @@ class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun setAppTheme(theme: AppTheme) {
         appThemeFlow.value = theme
+    }
+
+    override suspend fun setDumbModeEnabled(enabled: Boolean) {
+        dumbModeFlow.value = enabled
+    }
+
+    override suspend fun setAutoGrayscaleInFocusEnabled(enabled: Boolean) {
+        autoGrayscaleFlow.value = enabled
     }
 }
 
@@ -96,5 +108,13 @@ class SettingsUseCasesTest {
         updateAppThemeUseCase(AppTheme.E_INK_PAPER)
         val updated = getSettingsUseCase().first()
         assertEquals(AppTheme.E_INK_PAPER, updated.appTheme)
+    }
+
+    @Test
+    fun updateAutoGrayscaleInFocus_updatesFlow() = runTest {
+        val useCase = UpdateAutoGrayscaleInFocusUseCase(settingsRepository)
+        useCase(true)
+        val updated = getSettingsUseCase().first()
+        assertTrue(updated.isAutoGrayscaleInFocusEnabled)
     }
 }

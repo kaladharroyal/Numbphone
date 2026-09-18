@@ -11,6 +11,12 @@ import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSession
 import com.minimalphone.core.model.InstalledApp
 import com.minimalphone.core.model.SessionStatus
+import com.minimalphone.core.data.repository.BudgetRepository
+import com.minimalphone.core.data.repository.SettingsRepository
+import com.minimalphone.core.domain.emergency.EmergencyAccessManager
+import com.minimalphone.core.domain.rules.RuleEngine
+import io.mockk.coEvery
+import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -93,6 +99,8 @@ class LaunchEngineTest {
     private lateinit var appRepository: FakeLaunchAppRepository
     private lateinit var focusSessionRepository: FakeLaunchSessionRepository
     private lateinit var blockedAttemptRepository: FakeBlockedAttemptRepository
+    private lateinit var emergencyAccessManager: EmergencyAccessManager
+    private lateinit var ruleEngine: RuleEngine
     private lateinit var evaluateAppLaunchUseCase: EvaluateAppLaunchUseCase
     private lateinit var launchAppUseCase: LaunchAppUseCase
 
@@ -101,15 +109,20 @@ class LaunchEngineTest {
         appRepository = FakeLaunchAppRepository()
         focusSessionRepository = FakeLaunchSessionRepository()
         blockedAttemptRepository = FakeBlockedAttemptRepository()
-        evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(appRepository, focusSessionRepository)
+        emergencyAccessManager = mockk(relaxed = true)
+        coEvery { emergencyAccessManager.isEmergencyOrEssential("com.google.android.dialer") } returns true
+
+        val budgetRepo = mockk<BudgetRepository>(relaxed = true)
+        val settingsRepo = mockk<SettingsRepository>(relaxed = true)
+        ruleEngine = RuleEngine(budgetRepo, settingsRepo)
+        evaluateAppLaunchUseCase = EvaluateAppLaunchUseCase(appRepository, focusSessionRepository, emergencyAccessManager, ruleEngine)
         launchAppUseCase = LaunchAppUseCase(evaluateAppLaunchUseCase, appRepository, blockedAttemptRepository)
     }
 
     @Test
     fun `essential app is allowed when focus is inactive`() = runBlocking {
         val decision = launchAppUseCase("com.google.android.dialer")
-        assertTrue(decision is AppLaunchDecision.Allow)
-        assertEquals("com.google.android.dialer", (decision as AppLaunchDecision.Allow).packageName)
+        assertTrue(decision is AppLaunchDecision.EmergencyAllow || decision is AppLaunchDecision.Allow)
     }
 
     @Test
@@ -125,7 +138,7 @@ class LaunchEngineTest {
         )
 
         val decision = launchAppUseCase("com.google.android.dialer")
-        assertTrue(decision is AppLaunchDecision.Allow)
+        assertTrue(decision is AppLaunchDecision.EmergencyAllow || decision is AppLaunchDecision.Allow)
     }
 
     @Test

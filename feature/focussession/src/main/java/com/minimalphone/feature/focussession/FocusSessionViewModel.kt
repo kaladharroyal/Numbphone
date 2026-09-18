@@ -1,7 +1,9 @@
 package com.minimalphone.feature.focussession
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.minimalphone.core.data.repository.ScheduleRepository
 import com.minimalphone.core.domain.focus.CancelFocusSessionUseCase
 import com.minimalphone.core.domain.focus.CompleteFocusSessionUseCase
 import com.minimalphone.core.domain.focus.FocusTickerState
@@ -12,14 +14,21 @@ import com.minimalphone.core.domain.focus.StartFocusSessionUseCase
 import com.minimalphone.core.domain.friction.AbortExitAttemptUseCase
 import com.minimalphone.core.domain.friction.CompleteExitAttemptUseCase
 import com.minimalphone.core.domain.friction.PrepareExitAttemptUseCase
+import com.minimalphone.core.domain.schedule.FocusScheduler
 import com.minimalphone.core.model.FocusGoal
 import com.minimalphone.core.model.FocusMode
+import com.minimalphone.core.model.FocusPreset
+import com.minimalphone.core.model.FocusSchedule
 import com.minimalphone.core.model.FocusSession
 import com.minimalphone.core.model.PendingExitAttempt
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -41,7 +50,7 @@ data class FocusSessionUiState(
 
 @HiltViewModel
 class FocusSessionViewModel @Inject constructor(
-    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
+    @ApplicationContext private val context: Context,
     private val getFocusGoalsUseCase: GetFocusGoalsUseCase,
     private val getActiveFocusSessionUseCase: GetActiveFocusSessionUseCase,
     private val observeFocusSessionTickerUseCase: ObserveFocusSessionTickerUseCase,
@@ -50,16 +59,44 @@ class FocusSessionViewModel @Inject constructor(
     private val cancelFocusSessionUseCase: CancelFocusSessionUseCase,
     private val prepareExitAttemptUseCase: PrepareExitAttemptUseCase,
     private val completeExitAttemptUseCase: CompleteExitAttemptUseCase,
-    private val abortExitAttemptUseCase: AbortExitAttemptUseCase
+    private val abortExitAttemptUseCase: AbortExitAttemptUseCase,
+    private val scheduleRepository: ScheduleRepository,
+    private val focusScheduler: FocusScheduler,
+    private val settingsRepository: com.minimalphone.core.data.repository.SettingsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(FocusSessionUiState())
     val uiState: StateFlow<FocusSessionUiState> = _uiState.asStateFlow()
 
+    val presets: StateFlow<List<FocusPreset>> =
+        scheduleRepository.observePresets()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyList()
+            )
+
+    val schedules: StateFlow<List<FocusSchedule>> =
+        scheduleRepository.observeSchedules()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyList()
+            )
+
     init {
         loadGoals()
         observeActiveSession()
         observeTicker()
+        seedPresetsIfEmpty()
+    }
+
+    private fun seedPresetsIfEmpty() {
+        viewModelScope.launch {
+            scheduleRepository.seedDefaultPresets()
+            focusScheduler.evaluateScheduledFocus()
+            focusScheduler.scheduleNextAlarm()
+        }
     }
 
     private fun loadGoals() {
@@ -114,6 +151,20 @@ class FocusSessionViewModel @Inject constructor(
         )
     }
 
+    fun onSelectPreset(preset: FocusPreset) {
+        _uiState.value = _uiState.value.copy(
+            selectedDurationMinutes = preset.durationMinutes,
+            selectedMode = preset.mode,
+            selectedGoal = FocusGoal(
+                id = preset.id,
+                title = preset.title,
+                category = preset.category
+            ),
+            isCustomGoalSelected = false,
+            customGoalText = ""
+        )
+    }
+
     fun onSelectCustomGoal() {
         _uiState.value = _uiState.value.copy(
             isCustomGoalSelected = true,
@@ -125,6 +176,27 @@ class FocusSessionViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             customGoalText = text
         )
+    }
+
+    fun onToggleSchedule(scheduleId: String, enabled: Boolean) {
+        viewModelScope.launch {
+            scheduleRepository.setScheduleEnabled(scheduleId, enabled)
+            focusScheduler.scheduleNextAlarm()
+        }
+    }
+
+    fun onSaveSchedule(schedule: FocusSchedule) {
+        viewModelScope.launch {
+            scheduleRepository.saveSchedule(schedule)
+            focusScheduler.scheduleNextAlarm()
+        }
+    }
+
+    fun onDeleteSchedule(scheduleId: String) {
+        viewModelScope.launch {
+            scheduleRepository.deleteSchedule(scheduleId)
+            focusScheduler.scheduleNextAlarm()
+        }
     }
 
     fun onStartFocusSession() {
@@ -159,6 +231,9 @@ class FocusSessionViewModel @Inject constructor(
             result.fold(
                 onSuccess = { session ->
                     com.minimalphone.core.common.DndHelper.enablePriorityCallsOnlyDnd(context)
+                    if (runCatching { settingsRepository.isAutoGrayscaleInFocusEnabled.first() }.getOrDefault(false)) {
+                        com.minimalphone.core.common.GrayscaleHelper.setGrayscaleEnabled(context, true)
+                    }
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isSessionActive = true,
@@ -183,6 +258,9 @@ class FocusSessionViewModel @Inject constructor(
             if (session.mode == FocusMode.LIGHT) {
                 completeFocusSessionUseCase(session.id)
                 com.minimalphone.core.common.DndHelper.restoreNormalNotifications(context)
+                if (runCatching { settingsRepository.isAutoGrayscaleInFocusEnabled.first() }.getOrDefault(false)) {
+                    com.minimalphone.core.common.GrayscaleHelper.setGrayscaleEnabled(context, false)
+                }
                 return@launch
             }
 
@@ -216,6 +294,9 @@ class FocusSessionViewModel @Inject constructor(
                 exitReason = exitReason
             )
             com.minimalphone.core.common.DndHelper.restoreNormalNotifications(context)
+            if (runCatching { settingsRepository.isAutoGrayscaleInFocusEnabled.first() }.getOrDefault(false)) {
+                com.minimalphone.core.common.GrayscaleHelper.setGrayscaleEnabled(context, false)
+            }
             _uiState.value = _uiState.value.copy(
                 pendingExitAttempt = null,
                 isSessionActive = false,
@@ -229,6 +310,9 @@ class FocusSessionViewModel @Inject constructor(
             val sessionId = _uiState.value.activeSession?.id ?: return@launch
             completeFocusSessionUseCase(sessionId)
             com.minimalphone.core.common.DndHelper.restoreNormalNotifications(context)
+            if (runCatching { settingsRepository.isAutoGrayscaleInFocusEnabled.first() }.getOrDefault(false)) {
+                com.minimalphone.core.common.GrayscaleHelper.setGrayscaleEnabled(context, false)
+            }
         }
     }
 
