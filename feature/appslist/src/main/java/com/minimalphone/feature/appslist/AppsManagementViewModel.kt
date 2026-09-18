@@ -16,6 +16,7 @@ import javax.inject.Inject
 
 enum class AppListFilter {
     ALL,
+    HOME,
     ESSENTIAL,
     MANAGED
 }
@@ -25,6 +26,7 @@ data class AppsManagementUiState(
     val activeFilter: AppListFilter = AppListFilter.ALL,
     val apps: List<InstalledApp> = emptyList(),
     val totalAppsCount: Int = 0,
+    val homeAppsCount: Int = 0,
     val essentialCount: Int = 0,
     val managedCount: Int = 0
 )
@@ -49,6 +51,7 @@ class AppsManagementViewModel @Inject constructor(
 
             val matchesFilter = when (filter) {
                 AppListFilter.ALL -> true
+                AppListFilter.HOME -> app.isFavoriteOnHome
                 AppListFilter.ESSENTIAL -> app.category == AppCategory.ESSENTIAL
                 AppListFilter.MANAGED -> app.category == AppCategory.MANAGED
             }
@@ -61,6 +64,7 @@ class AppsManagementViewModel @Inject constructor(
             activeFilter = filter,
             apps = filtered,
             totalAppsCount = allApps.size,
+            homeAppsCount = allApps.count { it.isFavoriteOnHome },
             essentialCount = allApps.count { it.category == AppCategory.ESSENTIAL },
             managedCount = allApps.count { it.category == AppCategory.MANAGED }
         )

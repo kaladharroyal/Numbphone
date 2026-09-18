@@ -93,6 +93,26 @@ class AppsManagementViewModelTest {
 
         viewModel.onFilterSelected(AppListFilter.MANAGED)
         assertEquals(2, viewModel.uiState.value.apps.size)
+
+        viewModel.onFilterSelected(AppListFilter.HOME)
+        assertEquals(1, viewModel.uiState.value.apps.size)
+        assertEquals("Phone", viewModel.uiState.value.apps.first().label)
+        assertEquals(1, viewModel.uiState.value.homeAppsCount)
+    }
+
+    @Test
+    fun `toggleFavoriteOnHome updates home apps filter dynamically`() {
+        val repo = FakeManagementAppRepository()
+        val viewModel = AppsManagementViewModel(repo)
+
+        viewModel.onFilterSelected(AppListFilter.HOME)
+        assertEquals(1, viewModel.uiState.value.apps.size)
+
+        val youtube = repo.appsFlow.value.first { it.packageName == "com.google.android.youtube" }
+        viewModel.toggleFavoriteOnHome(youtube)
+
+        assertEquals(2, viewModel.uiState.value.apps.size)
+        assertEquals(2, viewModel.uiState.value.homeAppsCount)
     }
 
     @Test
