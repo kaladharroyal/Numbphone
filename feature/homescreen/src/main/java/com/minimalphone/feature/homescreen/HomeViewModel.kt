@@ -47,6 +47,7 @@ data class ReflectionDialogState(
     val isShowing: Boolean = false,
     val packageName: String = "",
     val appLabel: String = "",
+    val activityName: String = "",
     val focusSessionId: String? = null
 )
 
@@ -202,6 +203,7 @@ class HomeViewModel @Inject constructor(
                             isShowing = true,
                             packageName = app.packageName,
                             appLabel = app.label,
+                            activityName = app.activityName,
                             focusSessionId = decision.activeSession.id
                         )
                     )
@@ -239,12 +241,17 @@ class HomeViewModel @Inject constructor(
         )
     }
 
-    fun onRecordReflection(reason: String) {
+    fun onRecordReflection(
+        reason: String,
+        onLaunchApproved: ((packageName: String, activityName: String) -> Unit)? = null
+    ) {
         viewModelScope.launch {
             val state = _uiState.value.reflectionDialog
-            if (state.packageName.isNotBlank()) {
+            val pkg = state.packageName
+            val act = state.activityName
+            if (pkg.isNotBlank()) {
                 recordIntentReflectionUseCase(
-                    packageName = state.packageName,
+                    packageName = pkg,
                     appLabel = state.appLabel,
                     focusSessionId = state.focusSessionId,
                     userIntentReason = reason
@@ -253,6 +260,9 @@ class HomeViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 reflectionDialog = ReflectionDialogState(isShowing = false)
             )
+            if (pkg.isNotBlank()) {
+                onLaunchApproved?.invoke(pkg, act)
+            }
         }
     }
 

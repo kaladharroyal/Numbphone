@@ -98,16 +98,43 @@ object SystemHealthHelper {
         val manufacturer = Build.MANUFACTURER.lowercase()
         return when {
             manufacturer.contains("samsung") ->
-                "Samsung OneUI: In Device Care > Battery > Background usage limits, add Minimal Phone to 'Never sleeping apps'."
-            manufacturer.contains("xiaomi") || manufacturer.contains("redmi") || manufacturer.contains("poco") ->
-                "Xiaomi MIUI/HyperOS: In App Info, enable 'Autostart' and set Battery Saver to 'No restrictions'."
-            manufacturer.contains("oppo") || manufacturer.contains("realme") ->
-                "ColorOS / Realme UI: Enable 'Allow auto startup' and 'Allow background activity' in Battery settings."
-            manufacturer.contains("oneplus") ->
-                "OxygenOS: Set Battery optimization to 'Don't optimize' and lock Minimal Phone in Recent Apps."
-            manufacturer.contains("huawei") || manufacturer.contains("honor") ->
-                "Huawei/Honor: In Battery > App Launch, set Minimal Phone to 'Manage manually' with all toggles ON."
+                "Samsung OneUI: In Device Care > Battery > Background usage limits, add NumbPhone to 'Never sleeping apps'."
+            isMiui() ->
+                "MIUI: Go to Apps > Manage Apps > NumbPhone > Battery saver > select 'No restrictions'."
+            isEmui() ->
+                "EMUI: Go to Settings > Battery > App Launch > NumbPhone > set to 'Manage manually'."
+            isColorOs() ->
+                "ColorOS/Realme: In App info > Battery usage, enable 'Allow background activity'."
+            isOxygenOs() ->
+                "OxygenOS: Set Battery optimization to 'Don't optimize' and lock NumbPhone in Recent Apps."
+            isHuawei() ->
+                "Huawei/Honor: In Battery > App Launch, set NumbPhone to 'Manage manually' with all toggles ON."
             else -> null
         }
+    }
+
+    private fun isMiui(): Boolean {
+        val m = Build.MANUFACTURER.lowercase()
+        return m.contains("xiaomi") || m.contains("redmi") || m.contains("poco")
+    }
+
+    private fun isEmui(): Boolean {
+        val m = Build.MANUFACTURER.lowercase()
+        return m.contains("huawei")
+    }
+
+    private fun isColorOs(): Boolean {
+        val m = Build.MANUFACTURER.lowercase()
+        return m.contains("oppo") || m.contains("realme")
+    }
+
+    private fun isOxygenOs(): Boolean {
+        val m = Build.MANUFACTURER.lowercase()
+        return m.contains("oneplus")
+    }
+
+    private fun isHuawei(): Boolean {
+        val m = Build.MANUFACTURER.lowercase()
+        return m.contains("huawei") || m.contains("honor")
     }
 }

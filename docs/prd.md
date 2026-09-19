@@ -1,7 +1,7 @@
-# Product Requirements Document (PRD) — Minimal Phone
+# Product Requirements Document (PRD) — NumbPhone
 
 ## 1. Executive Summary
-Minimal Phone is a distraction-resistant Android launcher and digital wellbeing application designed to transform modern Android smartphones into intentional tools ("dumb phone" simplicity with modern reliability). The core philosophy is: **"Make intentional actions easy and impulsive actions deliberate."**
+NumbPhone is a distraction-resistant Android launcher and digital wellbeing application designed to transform modern Android smartphones into intentional tools ("dumb phone" simplicity with modern reliability). The core philosophy is: **"Make intentional actions easy and impulsive actions deliberate."**
 
 ## 2. Target Audience
 - **Primary Audience:** Students preparing for competitive exams who need zero-distraction environments without missing essential communication.

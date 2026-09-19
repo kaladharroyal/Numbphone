@@ -10,6 +10,8 @@ import com.minimalphone.core.data.repository.NotificationDigestRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,7 +27,7 @@ class MinimalNotificationListenerService : NotificationListenerService() {
     @Inject
     lateinit var digestRepository: NotificationDigestRepository
 
-    private val serviceScope = CoroutineScope(Dispatchers.IO)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
         private const val TAG = "MinimalNotificationListener"
@@ -67,13 +69,20 @@ class MinimalNotificationListenerService : NotificationListenerService() {
                         text = text
                     )
 
-                    // Cancel the visual distraction from the status bar
-                    cancelNotification(sbn.key)
+                    // Cancel the visual distraction from the status bar safely
+                    runCatching {
+                        cancelNotification(sbn.key)
+                    }
                     MinimalLog.i(TAG, "Bundled distracting notification from $appLabel into Focus Digest.")
                 }
             } catch (e: Exception) {
                 MinimalLog.e(TAG, "Error handling notification", e)
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        serviceScope.cancel()
     }
 }

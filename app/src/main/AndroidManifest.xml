@@ -93,9 +93,10 @@
         <!-- Scheduled Focus Alarm Receiver -->
         <receiver
             android:name=".receiver.FocusScheduleReceiver"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="com.minimalphone.ACTION_TRIGGER_SCHEDULED_FOCUS" />
+                <action android:name="com.minimalphone.ACTION_FOCUS_SESSION_EXPIRED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.TIME_SET" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />

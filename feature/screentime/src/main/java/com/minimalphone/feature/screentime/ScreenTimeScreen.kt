@@ -468,7 +468,7 @@ fun PermissionRequiredCard(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Minimal Phone requires Usage Access permission to track screen time on your device. Your data remains strictly local and is never uploaded anywhere.",
+                text = "NumbPhone requires Usage Access permission to track screen time on your device. Your data remains strictly local and is never uploaded anywhere.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MutedText
             )

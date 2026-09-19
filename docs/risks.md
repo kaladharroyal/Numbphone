@@ -1,4 +1,4 @@
-# Technical Risks & Mitigation Strategies — Minimal Phone
+# Technical Risks & Mitigation Strategies — NumbPhone
 
 ## 1. OEM Aggressive Background Killing (Samsung, Xiaomi, Huawei, OnePlus)
 - **Risk:** OEM battery managers may kill background services, leading to missed focus session end-times or delayed timers.
@@ -16,7 +16,7 @@
 ## 3. Package Visibility Restrictions (Android 11+)
 - **Risk:** `QUERY_ALL_PACKAGES` is subject to Play Store policy review.
 - **Mitigation:**
-  - Minimal Phone is a launcher application (`CATEGORY_HOME`), which qualifies for standard Play Store exception for full package visibility.
+  - NumbPhone is a launcher application (`CATEGORY_HOME`), which qualifies for standard Play Store exception for full package visibility.
   - Use `LauncherApps.getActivityList()` which is permitted for default launchers.
 
 ## 4. Work Profiles & Multiple Users

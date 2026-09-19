@@ -29,6 +29,11 @@ class DefaultFocusSessionRepository @Inject constructor(
         entity?.toModel()?.takeIf { it.isCurrentlyActive }
     }
 
+    override suspend fun getLatestActiveSessionRaw(): FocusSession? = withContext(Dispatchers.IO) {
+        val entity = focusSessionDao.getActiveSessionSync()
+        entity?.toModel()
+    }
+
     override fun getAllSessions(): Flow<List<FocusSession>> {
         return focusSessionDao.observeAllSessions().map { list ->
             list.map { it.toModel() }

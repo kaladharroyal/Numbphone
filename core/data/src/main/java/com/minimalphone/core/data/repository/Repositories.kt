@@ -26,6 +26,7 @@ interface AppRepository {
 interface FocusSessionRepository {
     fun getActiveSession(): Flow<FocusSession?>
     suspend fun getActiveSessionSync(): FocusSession?
+    suspend fun getLatestActiveSessionRaw(): FocusSession? = getActiveSessionSync()
     fun getAllSessions(): Flow<List<FocusSession>>
     suspend fun startSession(session: FocusSession)
     suspend fun completeSession(sessionId: String)

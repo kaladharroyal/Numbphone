@@ -230,6 +230,7 @@ class FocusSessionViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = { session ->
+                    focusScheduler.scheduleSessionExpiryAlarm(session.id, session.endTime)
                     com.minimalphone.core.common.DndHelper.enablePriorityCallsOnlyDnd(context)
                     if (runCatching { settingsRepository.isAutoGrayscaleInFocusEnabled.first() }.getOrDefault(false)) {
                         com.minimalphone.core.common.GrayscaleHelper.setGrayscaleEnabled(context, true)
@@ -256,6 +257,7 @@ class FocusSessionViewModel @Inject constructor(
 
             // If session is in LIGHT mode, allow direct completion without friction delay
             if (session.mode == FocusMode.LIGHT) {
+                focusScheduler.cancelSessionExpiryAlarm()
                 completeFocusSessionUseCase(session.id)
                 com.minimalphone.core.common.DndHelper.restoreNormalNotifications(context)
                 if (runCatching { settingsRepository.isAutoGrayscaleInFocusEnabled.first() }.getOrDefault(false)) {
@@ -286,6 +288,7 @@ class FocusSessionViewModel @Inject constructor(
     fun onConfirmExitAttempt(completedSeconds: Int, exitReason: String? = null) {
         viewModelScope.launch {
             val pending = _uiState.value.pendingExitAttempt ?: return@launch
+            focusScheduler.cancelSessionExpiryAlarm()
             completeExitAttemptUseCase(
                 sessionId = pending.sessionId,
                 attemptNumber = pending.attemptNumber,
@@ -308,6 +311,7 @@ class FocusSessionViewModel @Inject constructor(
     fun onEndSessionDirectly() {
         viewModelScope.launch {
             val sessionId = _uiState.value.activeSession?.id ?: return@launch
+            focusScheduler.cancelSessionExpiryAlarm()
             completeFocusSessionUseCase(sessionId)
             com.minimalphone.core.common.DndHelper.restoreNormalNotifications(context)
             if (runCatching { settingsRepository.isAutoGrayscaleInFocusEnabled.first() }.getOrDefault(false)) {

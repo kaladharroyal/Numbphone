@@ -1,5 +1,6 @@
 package com.minimalphone.feature.onboarding
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -146,8 +149,18 @@ private fun VisionStepContent() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        Image(
+            painter = painterResource(id = com.minimalphone.core.ui.R.drawable.numbphone_logo),
+            contentDescription = "NumbPhone Logo",
+            modifier = Modifier
+                .size(80.dp)
+                .clip(RoundedCornerShape(20.dp))
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         Text(
-            text = "MINIMAL PHONE",
+            text = "NUMBPHONE",
             style = MaterialTheme.typography.displayLarge,
             fontSize = 32.sp,
             fontWeight = FontWeight.Light,
@@ -168,7 +181,7 @@ private fun VisionStepContent() {
         Spacer(modifier = Modifier.height(32.dp))
 
         Text(
-            text = "Your phone is a tool. Minimal Phone removes dopamine traps, replaces chaotic home screens, and protects your focus sessions.",
+            text = "Your phone is a tool. NumbPhone removes dopamine traps, replaces chaotic home screens, and protects your focus sessions.",
             style = MaterialTheme.typography.bodyMedium,
             color = MutedText,
             textAlign = TextAlign.Center,
@@ -197,7 +210,7 @@ private fun DefaultLauncherStepContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "Set Minimal Phone as your default home app to replace your conventional home screen.",
+            text = "Set NumbPhone as your default home app to replace your conventional home screen.",
             style = MaterialTheme.typography.bodyMedium,
             color = MutedText,
             textAlign = TextAlign.Center,
@@ -454,7 +467,7 @@ private fun StepControls(
                 colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = PureBlack),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                Text(text = "ENTER MINIMAL PHONE", fontWeight = FontWeight.Bold)
+                Text(text = "ENTER NUMBPHONE", fontWeight = FontWeight.Bold)
             }
         } else {
             Button(

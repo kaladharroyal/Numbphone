@@ -1,10 +1,10 @@
-# Architecture Document — Minimal Phone
+# Architecture Document — NumbPhone
 
 ## 1. Architectural Overview
-Minimal Phone follows Clean Architecture principles with a multi-module architecture:
+NumbPhone follows Clean Architecture principles with a multi-module architecture:
 
 ```
-                    MINIMAL PHONE ARCHITECTURE
+                      NUMBPHONE ARCHITECTURE
                              │
                     ┌────────┴────────┐
                     │                 │
@@ -48,7 +48,7 @@ Minimal Phone follows Clean Architecture principles with a multi-module architec
 - **`:feature:focussession`**: Focus session creation, mode selector, goal setter, active session controls.
 - **`:feature:screentime`**: Screen-time metrics, category breakdown, blocked attempts summary.
 - **`:feature:onboarding`**: Onboarding step flow (Launcher, Usage Access, Accessibility, Battery).
-- **`:feature:settings`**: Settings, Diagnostics dashboard ("Minimal Phone Health"), privacy controls.
+- **`:feature:settings`**: Settings, Diagnostics dashboard ("NumbPhone Health"), privacy controls.
 
 ## 3. Data Flow & Source of Truth
 1. **Dynamic App Updates:**

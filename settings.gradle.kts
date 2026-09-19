@@ -23,7 +23,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MinimalPhone"
+rootProject.name = "NumbPhone"
 
 include(":app")
 include(":core:model")

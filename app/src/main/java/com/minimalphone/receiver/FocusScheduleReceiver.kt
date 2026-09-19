@@ -24,6 +24,7 @@ class FocusScheduleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
         if (action != FocusScheduler.ACTION_TRIGGER_SCHEDULED_FOCUS &&
+            action != FocusScheduler.ACTION_FOCUS_SESSION_EXPIRED &&
             action != Intent.ACTION_BOOT_COMPLETED &&
             action != Intent.ACTION_TIME_CHANGED &&
             action != Intent.ACTION_TIMEZONE_CHANGED
@@ -36,10 +37,15 @@ class FocusScheduleReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                focusScheduler.evaluateScheduledFocus()
-                focusScheduler.scheduleNextAlarm()
+                if (action == FocusScheduler.ACTION_FOCUS_SESSION_EXPIRED) {
+                    val sessionId = intent.getStringExtra(FocusScheduler.EXTRA_SESSION_ID) ?: ""
+                    focusScheduler.onSessionExpired(sessionId)
+                } else {
+                    focusScheduler.evaluateScheduledFocus()
+                    focusScheduler.scheduleNextAlarm()
+                }
             } catch (e: Exception) {
-                MinimalLog.e(TAG, "Error executing scheduled focus evaluation", e)
+                MinimalLog.e(TAG, "Error executing scheduled focus receiver action", e)
             } finally {
                 pendingResult.finish()
             }

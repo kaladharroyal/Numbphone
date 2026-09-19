@@ -29,7 +29,11 @@ class FocusScheduler @Inject constructor(
     companion object {
         private const val TAG = "FocusScheduler"
         const val ACTION_TRIGGER_SCHEDULED_FOCUS = "com.minimalphone.ACTION_TRIGGER_SCHEDULED_FOCUS"
+        const val ACTION_FOCUS_SESSION_EXPIRED = "com.minimalphone.ACTION_FOCUS_SESSION_EXPIRED"
         const val EXTRA_SCHEDULE_ID = "extra_schedule_id"
+        const val EXTRA_SESSION_ID = "extra_session_id"
+        private const val REQUEST_CODE_SCHEDULED_FOCUS = 1001
+        private const val REQUEST_CODE_SESSION_EXPIRY = 1002
     }
 
     /**
@@ -63,7 +67,7 @@ class FocusScheduler @Inject constructor(
                     val remainingMinutes = java.time.Duration.between(currentTime, end).toMinutes().toInt().coerceAtLeast(1)
                     MinimalLog.i(TAG, "Starting scheduled focus '${schedule.title}' for remaining ${remainingMinutes}m")
 
-                    startFocusSessionUseCase(
+                    val result = startFocusSessionUseCase(
                         goal = FocusGoal(
                             id = schedule.id,
                             title = schedule.title,
@@ -73,11 +77,73 @@ class FocusScheduler @Inject constructor(
                         durationMinutes = remainingMinutes,
                         mode = schedule.mode
                     )
+                    result.getOrNull()?.let { session ->
+                        com.minimalphone.core.common.DndHelper.enablePriorityCallsOnlyDnd(context)
+                        scheduleSessionExpiryAlarm(session.id, session.endTime)
+                    }
                     return true
                 }
             }
         }
         return false
+    }
+
+    /**
+     * Schedules an AlarmManager wakeup for when the active focus session concludes.
+     */
+    fun scheduleSessionExpiryAlarm(sessionId: String, endTimeMillis: Long) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val intent = Intent(ACTION_FOCUS_SESSION_EXPIRED).apply {
+            setPackage(context.packageName)
+            putExtra(EXTRA_SESSION_ID, sessionId)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            REQUEST_CODE_SESSION_EXPIRY,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        try {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, endTimeMillis, pendingIntent)
+            MinimalLog.i(TAG, "Scheduled session expiry alarm for session '$sessionId' at $endTimeMillis")
+        } catch (e: Exception) {
+            MinimalLog.e(TAG, "Failed to schedule session expiry alarm", e)
+        }
+    }
+
+    /**
+     * Cancels any pending focus session expiry alarm.
+     */
+    fun cancelSessionExpiryAlarm() {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+        val intent = Intent(ACTION_FOCUS_SESSION_EXPIRED).apply {
+            setPackage(context.packageName)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            REQUEST_CODE_SESSION_EXPIRY,
+            intent,
+            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+        )
+        if (pendingIntent != null) {
+            alarmManager.cancel(pendingIntent)
+            pendingIntent.cancel()
+            MinimalLog.i(TAG, "Cancelled session expiry alarm")
+        }
+    }
+
+    /**
+     * Invoked when the session expiry alarm fires in the background.
+     */
+    suspend fun onSessionExpired(sessionId: String) {
+        MinimalLog.i(TAG, "Handling session expiry alarm for session '$sessionId'")
+        if (sessionId.isNotBlank()) {
+            focusSessionRepository.completeSession(sessionId)
+        }
+        com.minimalphone.core.common.DndHelper.restoreNormalNotifications(context)
+        com.minimalphone.core.common.GrayscaleHelper.setGrayscaleEnabled(context, false)
+        scheduleNextAlarm()
     }
 
     /**
@@ -116,7 +182,7 @@ class FocusScheduler @Inject constructor(
             }
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
-                1001,
+                REQUEST_CODE_SCHEDULED_FOCUS,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )

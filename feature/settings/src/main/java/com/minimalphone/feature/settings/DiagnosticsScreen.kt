@@ -106,7 +106,7 @@ fun DiagnosticsScreen(
                 item {
                     DiagnosticItemCard(
                         title = "Default Launcher",
-                        description = "Minimal Phone acts as your primary distraction-resistant home screen.",
+                        description = "NumbPhone acts as your primary distraction-resistant home screen.",
                         isPassed = state.isDefaultLauncher,
                         actionLabel = if (state.isDefaultLauncher) "CONFIGURED" else "SET AS DEFAULT",
                         onActionClick = { viewModel.openDefaultLauncherSettings() }

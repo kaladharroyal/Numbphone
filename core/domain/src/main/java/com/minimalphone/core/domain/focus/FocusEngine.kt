@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
@@ -96,7 +98,8 @@ class GetActiveFocusSessionUseCase @Inject constructor(
 }
 
 class ObserveFocusSessionTickerUseCase @Inject constructor(
-    private val focusSessionRepository: FocusSessionRepository
+    private val focusSessionRepository: FocusSessionRepository,
+    private val completeFocusSessionUseCase: CompleteFocusSessionUseCase? = null
 ) {
     operator fun invoke(): Flow<FocusTickerState> {
         return focusSessionRepository.getActiveSession().flatMapLatest { session ->
@@ -139,7 +142,11 @@ class ObserveFocusSessionTickerUseCase @Inject constructor(
                         )
 
                         if (isCompleted) {
-                            focusSessionRepository.completeSession(session.id)
+                            if (completeFocusSessionUseCase != null) {
+                                completeFocusSessionUseCase(session.id)
+                            } else {
+                                focusSessionRepository.completeSession(session.id)
+                            }
                             break
                         }
 
@@ -152,10 +159,15 @@ class ObserveFocusSessionTickerUseCase @Inject constructor(
 }
 
 class CompleteFocusSessionUseCase @Inject constructor(
-    private val focusSessionRepository: FocusSessionRepository
+    private val focusSessionRepository: FocusSessionRepository,
+    @ApplicationContext private val context: Context? = null
 ) {
     suspend operator fun invoke(sessionId: String) {
         focusSessionRepository.completeSession(sessionId)
+        context?.let { ctx ->
+            com.minimalphone.core.common.DndHelper.restoreNormalNotifications(ctx)
+            com.minimalphone.core.common.GrayscaleHelper.setGrayscaleEnabled(ctx, false)
+        }
     }
 }
 

@@ -26,8 +26,8 @@ class RestoreFocusOnBootUseCase @Inject constructor(
             // Non-critical if package sync fails on early boot
         }
 
-        // 2. Query active session
-        val activeSession = focusSessionRepository.getActiveSessionSync()
+        // 2. Query active session (including sessions that may have expired while powered off)
+        val activeSession = focusSessionRepository.getLatestActiveSessionRaw()
             ?: return BootRecoveryResult.NoActiveSession
 
         val currentTime = System.currentTimeMillis()

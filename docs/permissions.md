@@ -1,4 +1,4 @@
-# Permissions Guide — Minimal Phone
+# Permissions Guide — NumbPhone
 
 ## 1. Required & Optional Permissions
 
@@ -15,4 +15,4 @@
 ## 2. Accessibility Service Scope & Transparency
 - **What it monitors:** Only foreground window changes (`TYPE_WINDOW_STATE_CHANGED`).
 - **Data retention:** Zero keystroke tracking, zero screen reading, zero credential logging.
-- **Action taken:** When an active focus session is running and a managed package is brought to foreground via notification/recents, the service triggers `ACTION_MAIN / CATEGORY_HOME` to return the user to Minimal Phone.
+- **Action taken:** When an active focus session is running and a managed package is brought to foreground via notification/recents, the service triggers `ACTION_MAIN / CATEGORY_HOME` to return the user to NumbPhone.

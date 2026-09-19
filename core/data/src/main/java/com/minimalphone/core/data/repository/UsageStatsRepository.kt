@@ -125,8 +125,33 @@ class DefaultUsageStatsRepository @Inject constructor(
             var essentialTime = 0L
 
             for ((pkg, timeForeground) in aggregatedStats) {
+                val lowerPkg = pkg.lowercase()
+                if (lowerPkg == "android" ||
+                    lowerPkg == "com.android.systemui" ||
+                    lowerPkg.contains("nexuslauncher") ||
+                    lowerPkg.contains("quickstep") ||
+                    lowerPkg.contains("inputmethod") ||
+                    lowerPkg.contains("keyboard") ||
+                    lowerPkg.contains("keyguard")
+                ) {
+                    continue
+                }
+
                 val dbApp = installedAppDao.getApp(pkg)
-                val label = dbApp?.label ?: pkg.substringAfterLast('.')
+                // If not in database, verify if it is an actual launchable user app
+                val isLaunchable = dbApp != null || runCatching {
+                    context.packageManager.getLaunchIntentForPackage(pkg) != null
+                }.getOrDefault(false)
+
+                if (!isLaunchable) {
+                    continue
+                }
+
+                val label = dbApp?.label ?: runCatching {
+                    val appInfo = context.packageManager.getApplicationInfo(pkg, 0)
+                    context.packageManager.getApplicationLabel(appInfo).toString()
+                }.getOrDefault(pkg.substringAfterLast('.'))
+
                 val category = dbApp?.category ?: AppCategory.MANAGED
                 val isEssential = (category == AppCategory.ESSENTIAL)
 

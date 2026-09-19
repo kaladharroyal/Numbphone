@@ -311,7 +311,7 @@ fun AppsManagementScreen(
                             ) {
                                 Column {
                                     Text(
-                                        text = "Minimal Phone Settings",
+                                        text = "NumbPhone Settings",
                                         style = MaterialTheme.typography.titleMedium,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold

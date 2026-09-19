@@ -6,6 +6,7 @@ import android.content.Intent
 import com.minimalphone.core.common.MinimalLog
 import com.minimalphone.core.domain.boot.BootRecoveryResult
 import com.minimalphone.core.domain.boot.RestoreFocusOnBootUseCase
+import com.minimalphone.core.domain.schedule.FocusScheduler
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +18,9 @@ class MinimalBootReceiver : BroadcastReceiver() {
 
     @Inject
     lateinit var restoreFocusOnBootUseCase: RestoreFocusOnBootUseCase
+
+    @Inject
+    lateinit var focusScheduler: FocusScheduler
 
     companion object {
         private const val TAG = "MinimalBootReceiver"
@@ -39,12 +43,15 @@ class MinimalBootReceiver : BroadcastReceiver() {
                 when (val result = restoreFocusOnBootUseCase()) {
                     is BootRecoveryResult.Restored -> {
                         val remainingMinutes = result.session.remainingMillis / 60000L
+                        focusScheduler.scheduleSessionExpiryAlarm(result.session.id, result.session.endTime)
                         MinimalLog.i(
                             TAG,
                             "Restored active focus session '${result.session.id}' (${result.session.goal.title}) remaining: ${remainingMinutes}m."
                         )
                     }
                     is BootRecoveryResult.ExpiredAndCompleted -> {
+                        com.minimalphone.core.common.DndHelper.restoreNormalNotifications(context)
+                        com.minimalphone.core.common.GrayscaleHelper.setGrayscaleEnabled(context, false)
                         MinimalLog.i(
                             TAG,
                             "Session '${result.session.id}' expired while offline. Completed automatically."
@@ -54,6 +61,9 @@ class MinimalBootReceiver : BroadcastReceiver() {
                         MinimalLog.i(TAG, "No active focus session required restoration on boot.")
                     }
                 }
+
+                focusScheduler.evaluateScheduledFocus()
+                focusScheduler.scheduleNextAlarm()
             } catch (e: Exception) {
                 MinimalLog.e(TAG, "Error restoring state during boot", e)
             } finally {

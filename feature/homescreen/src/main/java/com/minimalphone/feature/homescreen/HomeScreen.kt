@@ -334,7 +334,15 @@ fun HomeScreen(
                 appLabel = uiState.reflectionDialog.appLabel,
                 onDismiss = { viewModel.dismissReflectionDialog() },
                 onSubmitReflection = { reason ->
-                    viewModel.onRecordReflection(reason)
+                    viewModel.onRecordReflection(reason) { pkg, act ->
+                        val targetApp = uiState.visibleApps.find { it.packageName == pkg }
+                            ?: com.minimalphone.core.model.InstalledApp(
+                                packageName = pkg,
+                                activityName = act,
+                                label = uiState.reflectionDialog.appLabel
+                            )
+                        handleAppLaunch(context, targetApp)
+                    }
                 }
             )
         }
