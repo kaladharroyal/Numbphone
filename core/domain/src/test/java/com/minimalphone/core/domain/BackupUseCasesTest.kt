@@ -203,6 +203,15 @@ class FakeSettingsRepositoryForBackup : SettingsRepository {
     override val defaultSessionMinutes: Flow<Int> = MutableStateFlow(10)
     override val defaultPauseStyle: Flow<com.minimalphone.core.model.PauseStyle> = MutableStateFlow(com.minimalphone.core.model.PauseStyle.BREATHE)
     override val progressiveDelayEnabled: Flow<Boolean> = MutableStateFlow(false)
+    val gestureConfigFlow = MutableStateFlow(com.minimalphone.core.model.GestureAction.defaultGestureConfig())
+    val searchAutoLaunchModeFlow = MutableStateFlow(com.minimalphone.core.model.AutoLaunchMode.ESSENTIAL_AND_PINNED)
+    val searchFuzzyEnabledFlow = MutableStateFlow(true)
+    val gestureHintShownFlow = MutableStateFlow(false)
+
+    override val gestureConfig: Flow<Map<com.minimalphone.core.model.GestureType, com.minimalphone.core.model.GestureAction>> = gestureConfigFlow
+    override val searchAutoLaunchMode: Flow<com.minimalphone.core.model.AutoLaunchMode> = searchAutoLaunchModeFlow
+    override val searchFuzzyEnabled: Flow<Boolean> = searchFuzzyEnabledFlow
+    override val gestureHintShown: Flow<Boolean> = gestureHintShownFlow
 
     override suspend fun setOnboardingCompleted(completed: Boolean) { onboardingFlow.value = completed }
     override suspend fun setAdaptiveFrictionEnabled(enabled: Boolean) { frictionFlow.value = enabled }
@@ -219,6 +228,23 @@ class FakeSettingsRepositoryForBackup : SettingsRepository {
     override suspend fun setDefaultSessionMinutes(minutes: Int) {}
     override suspend fun setDefaultPauseStyle(style: com.minimalphone.core.model.PauseStyle) {}
     override suspend fun setProgressiveDelayEnabled(enabled: Boolean) {}
+    override suspend fun setGestureAction(type: com.minimalphone.core.model.GestureType, action: com.minimalphone.core.model.GestureAction) {
+        val map = gestureConfigFlow.value.toMutableMap()
+        map[type] = action
+        gestureConfigFlow.value = map
+    }
+    override suspend fun setGestureConfig(config: Map<com.minimalphone.core.model.GestureType, com.minimalphone.core.model.GestureAction>) {
+        gestureConfigFlow.value = config
+    }
+    override suspend fun setSearchAutoLaunchMode(mode: com.minimalphone.core.model.AutoLaunchMode) {
+        searchAutoLaunchModeFlow.value = mode
+    }
+    override suspend fun setSearchFuzzyEnabled(enabled: Boolean) {
+        searchFuzzyEnabledFlow.value = enabled
+    }
+    override suspend fun setGestureHintShown(shown: Boolean) {
+        gestureHintShownFlow.value = shown
+    }
 }
 
 class BackupUseCasesTest {

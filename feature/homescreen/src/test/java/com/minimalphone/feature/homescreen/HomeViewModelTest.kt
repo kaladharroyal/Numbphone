@@ -162,6 +162,10 @@ class HomeViewModelTest {
 
         val settingsRepository = mockk<SettingsRepository>(relaxed = true)
         every { settingsRepository.isDumbModeEnabled } returns MutableStateFlow(false)
+        every { settingsRepository.gestureHintShown } returns MutableStateFlow(true)
+        every { settingsRepository.gestureConfig } returns MutableStateFlow(com.minimalphone.core.model.GestureAction.defaultGestureConfig())
+        every { settingsRepository.searchAutoLaunchMode } returns MutableStateFlow(com.minimalphone.core.model.AutoLaunchMode.ESSENTIAL_AND_PINNED)
+        every { settingsRepository.searchFuzzyEnabled } returns MutableStateFlow(true)
 
         val launcherPolicy = LauncherPolicy()
         val essentialAppRepository = mockk<EssentialAppRepository>(relaxed = true)
@@ -393,5 +397,46 @@ class HomeViewModelTest {
         assertTrue(viewModel.uiState.value.timeLimitExpiredDialog.isShowing)
         assertEquals("com.google.android.youtube", viewModel.uiState.value.timeLimitExpiredDialog.packageName)
         assertEquals("YouTube", viewModel.uiState.value.timeLimitExpiredDialog.appLabel)
+    }
+
+    @Test
+    fun `openSearch and closeSearch update search state properly`() {
+        val fakeRepo = FakeHomeAppRepository()
+        val fakeSessionRepo = FakeHomeFocusSessionRepository()
+        val fakeBlockedRepo = FakeHomeBlockedAttemptRepository()
+
+        val viewModel = createViewModel(fakeRepo, fakeSessionRepo, fakeBlockedRepo)
+
+        assertFalse(viewModel.uiState.value.isSearchOpen)
+        viewModel.openSearch()
+        assertTrue(viewModel.uiState.value.isSearchOpen)
+        assertEquals("", viewModel.uiState.value.searchQuery)
+
+        viewModel.onSearchQueryChange("calc")
+        assertEquals("calc", viewModel.uiState.value.searchQuery)
+
+        viewModel.closeSearch()
+        assertFalse(viewModel.uiState.value.isSearchOpen)
+        assertEquals("", viewModel.uiState.value.searchQuery)
+    }
+
+    @Test
+    fun `onGestureRecognized with SWIPE_UP opens search`() {
+        val fakeRepo = FakeHomeAppRepository()
+        val fakeSessionRepo = FakeHomeFocusSessionRepository()
+        val fakeBlockedRepo = FakeHomeBlockedAttemptRepository()
+
+        val viewModel = createViewModel(fakeRepo, fakeSessionRepo, fakeBlockedRepo)
+
+        assertFalse(viewModel.uiState.value.isSearchOpen)
+        viewModel.onGestureRecognized(
+            type = com.minimalphone.core.model.GestureType.SWIPE_UP,
+            onNavigateToControlCenter = {},
+            onNavigateToSettings = {},
+            onNavigateToFocus = {},
+            onAllowLaunch = { _, _ -> },
+            onShowMessage = {}
+        )
+        assertTrue(viewModel.uiState.value.isSearchOpen)
     }
 }
