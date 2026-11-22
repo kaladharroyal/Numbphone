@@ -55,6 +55,9 @@ class FakeSettingsRepo : SettingsRepository {
     override val appTheme: Flow<AppTheme> = MutableStateFlow(AppTheme.PURE_BLACK)
     override val isDumbModeEnabled: Flow<Boolean> = dumbModeFlow
     override val isAutoGrayscaleInFocusEnabled: Flow<Boolean> = MutableStateFlow(false)
+    override val settingsGuardMode: Flow<com.minimalphone.core.model.SettingsGuardMode> = MutableStateFlow(com.minimalphone.core.model.SettingsGuardMode.OFF)
+    override val quarantineHours: Flow<com.minimalphone.core.model.QuarantineHours> = MutableStateFlow(com.minimalphone.core.model.QuarantineHours.TWENTY_FOUR)
+    override val uninstallLockEnabled: Flow<Boolean> = MutableStateFlow(false)
 
     override suspend fun setOnboardingCompleted(completed: Boolean) {}
     override suspend fun setAdaptiveFrictionEnabled(enabled: Boolean) {}
@@ -65,6 +68,9 @@ class FakeSettingsRepo : SettingsRepository {
         dumbModeFlow.value = enabled
     }
     override suspend fun setAutoGrayscaleInFocusEnabled(enabled: Boolean) {}
+    override suspend fun setSettingsGuardMode(mode: com.minimalphone.core.model.SettingsGuardMode) {}
+    override suspend fun setQuarantineHours(hours: com.minimalphone.core.model.QuarantineHours) {}
+    override suspend fun setUninstallLockEnabled(enabled: Boolean) {}
 }
 
 class RuleEngineTest {

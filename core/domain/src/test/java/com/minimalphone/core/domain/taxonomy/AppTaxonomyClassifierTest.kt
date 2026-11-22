@@ -1,6 +1,7 @@
 package com.minimalphone.core.domain.taxonomy
 
 import com.minimalphone.core.model.AppTaxonomy
+import com.minimalphone.core.model.ClassificationSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -45,5 +46,62 @@ class AppTaxonomyClassifierTest {
         assertTrue(classifier.isEssentialByDefault("com.google.android.apps.messaging", "Messages"))
         assertTrue(classifier.isEssentialByDefault("com.android.settings", "Settings"))
         assertFalse(classifier.isEssentialByDefault("com.instagram.android", "Instagram"))
+    }
+
+    // ─────────── M21: WebAPK Tests ───────────
+
+    @Test
+    fun `chromium webapk package is detected as webapk`() {
+        assertTrue(classifier.isWebApk("org.chromium.webapk.a1b2c3d4e5f6"))
+    }
+
+    @Test
+    fun `non-webapk package is not detected as webapk`() {
+        assertFalse(classifier.isWebApk("com.instagram.android"))
+    }
+
+    @Test
+    fun `package ending in webapk is detected`() {
+        assertTrue(classifier.isWebApk("some.banking.webapk"))
+    }
+
+    // ─────────── M21: Clone Indicator Tests ───────────
+
+    @Test
+    fun `package with clone suffix is detected as clone`() {
+        assertTrue(classifier.isCloneIndicator("com.instagram.android.clone"))
+    }
+
+    @Test
+    fun `package with dual in path is detected as clone`() {
+        assertTrue(classifier.isCloneIndicator("com.facebook.dual.katana"))
+    }
+
+    @Test
+    fun `normal package is not detected as clone`() {
+        assertFalse(classifier.isCloneIndicator("com.instagram.android"))
+    }
+
+    // ─────────── M21: Sibling / Family Taxonomy ───────────
+
+    @Test
+    fun `instagram lite classifies to same taxonomy as instagram`() {
+        val taxonomy1 = classifier.classify("com.instagram.android", "Instagram")
+        val taxonomy2 = classifier.classify("com.instagram.lite", "Instagram Lite")
+        assertEquals(taxonomy1, taxonomy2)
+    }
+
+    // ─────────── M21: ClassificationSource Tests ───────────
+
+    @Test
+    fun `webapk package returns WEB_APP classification source`() {
+        val source = classifier.classifySource("org.chromium.webapk.abc123")
+        assertEquals(ClassificationSource.WEB_APP, source)
+    }
+
+    @Test
+    fun `normal package returns AUTOMATIC_DEFAULT classification source`() {
+        val source = classifier.classifySource("com.instagram.android")
+        assertEquals(ClassificationSource.AUTOMATIC_DEFAULT, source)
     }
 }
