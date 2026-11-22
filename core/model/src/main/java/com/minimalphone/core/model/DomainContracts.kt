@@ -7,7 +7,9 @@ data class AppRule(
     val isBlockedInFocus: Boolean,
     val customLabel: String? = null,
     val classificationSource: ClassificationSource = ClassificationSource.AUTOMATIC_DEFAULT,
-    val updatedTimestamp: Long = System.currentTimeMillis()
+    val updatedTimestamp: Long = System.currentTimeMillis(),
+    val familyId: String? = null,
+    val quarantineUntil: Long? = null
 )
 
 data class BlockedAttempt(
@@ -28,7 +30,8 @@ data class ExitAttempt(
     val completedFrictionSeconds: Int,
     val timestamp: Long = System.currentTimeMillis(),
     val isSuccessfulExit: Boolean = false,
-    val exitReason: String? = null
+    val exitReason: String? = null,
+    val route: String = "FOCUS_SESSION"
 )
 
 sealed interface AppLaunchDecision {
@@ -45,12 +48,21 @@ enum class BypassRoute {
     NOTIFICATION,
     RECENTS,
     DEEP_LINK,
-    EXTERNAL_INTENT
+    EXTERNAL_INTENT,
+    SETTINGS_GUARD,
+    UNINSTALL_GUARD,
+    QUARANTINE
 }
 
 sealed interface BypassDecision {
     data object Allow : BypassDecision
     data class InterceptAndRedirect(val packageName: String, val session: FocusSession) : BypassDecision
+}
+
+sealed interface SettingsGuardDecision {
+    data object Allow : SettingsGuardDecision
+    data class Block(val route: String = "SETTINGS_GUARD") : SettingsGuardDecision
+    data class AllowLogged(val unknownClass: String) : SettingsGuardDecision
 }
 
 data class PendingExitAttempt(

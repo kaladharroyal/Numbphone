@@ -55,6 +55,10 @@ interface SettingsRepository {
     val appTheme: Flow<com.minimalphone.core.model.AppTheme>
     val isDumbModeEnabled: Flow<Boolean>
     val isAutoGrayscaleInFocusEnabled: Flow<Boolean>
+    val settingsGuardMode: Flow<com.minimalphone.core.model.SettingsGuardMode>
+    val quarantineHours: Flow<com.minimalphone.core.model.QuarantineHours>
+    val uninstallLockEnabled: Flow<Boolean>
+
     suspend fun setOnboardingCompleted(completed: Boolean)
     suspend fun setAdaptiveFrictionEnabled(enabled: Boolean)
     suspend fun setDefaultFocusDurationMinutes(minutes: Int)
@@ -62,6 +66,23 @@ interface SettingsRepository {
     suspend fun setAppTheme(theme: com.minimalphone.core.model.AppTheme)
     suspend fun setDumbModeEnabled(enabled: Boolean)
     suspend fun setAutoGrayscaleInFocusEnabled(enabled: Boolean)
+    suspend fun setSettingsGuardMode(mode: com.minimalphone.core.model.SettingsGuardMode)
+    suspend fun setQuarantineHours(hours: com.minimalphone.core.model.QuarantineHours)
+    suspend fun setUninstallLockEnabled(enabled: Boolean)
+}
+
+/**
+ * Manages user-defined rules, quarantine status, and family linkages for applications (M21).
+ */
+interface AppRuleRepository {
+    suspend fun getQuarantineUntil(packageName: String): Long?
+    suspend fun setQuarantineUntil(packageName: String, until: Long?)
+    suspend fun getFamilyId(packageName: String): String?
+    suspend fun getByFamily(familyId: String): List<AppRule>
+    suspend fun clearExpiredQuarantines()
+    fun observeQuarantinedCount(): Flow<Int>
+    suspend fun getRule(packageName: String): AppRule?
+    suspend fun saveRule(rule: AppRule)
 }
 
 /**
@@ -123,8 +144,3 @@ interface ContactRepository {
     suspend fun saveContact(name: String, phoneNumber: String, isPinned: Boolean = true)
     suspend fun deleteContact(id: String)
 }
-
-
-
-
-

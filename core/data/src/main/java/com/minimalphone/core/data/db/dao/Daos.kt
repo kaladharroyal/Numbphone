@@ -63,8 +63,23 @@ interface AppRuleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertRule(rule: AppRuleEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertRules(rules: List<AppRuleEntity>)
+
     @Query("DELETE FROM app_rules WHERE packageName = :packageName")
     suspend fun deleteRule(packageName: String)
+
+    @Query("SELECT * FROM app_rules WHERE quarantineUntil IS NOT NULL AND quarantineUntil > :now")
+    suspend fun getQuarantinedApps(now: Long): List<AppRuleEntity>
+
+    @Query("UPDATE app_rules SET quarantineUntil = NULL WHERE quarantineUntil IS NOT NULL AND quarantineUntil <= :now")
+    suspend fun clearExpiredQuarantines(now: Long)
+
+    @Query("SELECT * FROM app_rules WHERE familyId = :familyId")
+    suspend fun getByFamily(familyId: String): List<AppRuleEntity>
+
+    @Query("SELECT COUNT(*) FROM app_rules WHERE quarantineUntil IS NOT NULL AND quarantineUntil > :now")
+    fun observeQuarantinedCount(now: Long): Flow<Int>
 }
 
 @Dao

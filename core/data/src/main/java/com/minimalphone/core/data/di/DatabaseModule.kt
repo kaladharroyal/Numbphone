@@ -30,7 +30,8 @@ object DatabaseModule {
             context,
             MinimalPhoneDatabase::class.java,
             MinimalPhoneDatabase.DATABASE_NAME
-        ).fallbackToDestructiveMigration()
+        ).addMigrations(MinimalPhoneDatabase.MIGRATION_8_9)
+         .fallbackToDestructiveMigration()
          .build()
     }
 

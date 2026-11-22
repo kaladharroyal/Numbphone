@@ -6,11 +6,11 @@ import android.os.Handler
 import android.os.Looper
 import android.os.UserHandle
 import com.minimalphone.core.common.MinimalLog
-import com.minimalphone.core.data.defaults.DefaultsBootstrapper
 import com.minimalphone.core.data.db.dao.AppRuleDao
 import com.minimalphone.core.data.db.dao.InstalledAppDao
 import com.minimalphone.core.data.db.entity.AppRuleEntity
 import com.minimalphone.core.data.db.entity.InstalledAppEntity
+import com.minimalphone.core.data.defaults.DefaultsBootstrapper
 import com.minimalphone.core.data.scanner.AppScanner
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.ClassificationSource
@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,7 +34,8 @@ class DefaultAppRepository @Inject constructor(
     private val appScanner: AppScanner,
     private val installedAppDao: InstalledAppDao,
     private val appRuleDao: AppRuleDao,
-    private val defaultsBootstrapper: DefaultsBootstrapper
+    private val defaultsBootstrapper: DefaultsBootstrapper,
+    private val settingsRepository: SettingsRepository
 ) : AppRepository {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -41,27 +43,25 @@ class DefaultAppRepository @Inject constructor(
 
     private val launcherCallback = object : LauncherApps.Callback() {
         override fun onPackageAdded(packageName: String, user: UserHandle) {
-            MinimalLog.i(TAG, "LauncherApps.Callback: onPackageAdded ($packageName)")
-            scope.launch { onPackageAdded(packageName) }
+            MinimalLog.i(TAG, "LauncherApps callback: onPackageAdded ($packageName, user: $user)")
+            scope.launch { this@DefaultAppRepository.onPackageAdded(packageName) }
         }
 
         override fun onPackageRemoved(packageName: String, user: UserHandle) {
-            MinimalLog.i(TAG, "LauncherApps.Callback: onPackageRemoved ($packageName)")
-            scope.launch { onPackageRemoved(packageName) }
+            MinimalLog.i(TAG, "LauncherApps callback: onPackageRemoved ($packageName, user: $user)")
+            scope.launch { this@DefaultAppRepository.onPackageRemoved(packageName) }
         }
 
         override fun onPackageChanged(packageName: String, user: UserHandle) {
-            MinimalLog.i(TAG, "LauncherApps.Callback: onPackageChanged ($packageName)")
-            scope.launch { onPackageChanged(packageName) }
+            MinimalLog.i(TAG, "LauncherApps callback: onPackageChanged ($packageName, user: $user)")
+            scope.launch { this@DefaultAppRepository.onPackageChanged(packageName) }
         }
 
         override fun onPackagesAvailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) {
-            MinimalLog.i(TAG, "LauncherApps.Callback: onPackagesAvailable (${packageNames.joinToString()})")
             scope.launch { syncInstalledApps() }
         }
 
         override fun onPackagesUnavailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) {
-            MinimalLog.i(TAG, "LauncherApps.Callback: onPackagesUnavailable (${packageNames.joinToString()})")
             scope.launch { syncInstalledApps() }
         }
     }
@@ -118,6 +118,7 @@ class DefaultAppRepository @Inject constructor(
         val entities = discoveredApps.map { app ->
             // Check if user has an existing override in app_rules
             val existingRule = appRuleDao.getRule(app.packageName)
+            val familyId = existingRule?.familyId
             if (existingRule != null) {
                 InstalledAppEntity(
                     packageName = app.packageName,
@@ -131,10 +132,13 @@ class DefaultAppRepository @Inject constructor(
                     iconKey = app.iconKey,
                     lastUsedTimestamp = app.lastUsedTimestamp,
                     installedTimestamp = app.installedTimestamp,
-                    classificationSource = existingRule.classificationSource
+                    classificationSource = existingRule.classificationSource,
+                    familyId = familyId,
+                    quarantineUntil = existingRule.quarantineUntil,
+                    isClone = app.isClone
                 )
             } else {
-                app.toEntity()
+                app.toEntity().copy(familyId = familyId)
             }
         }
 
@@ -148,6 +152,8 @@ class DefaultAppRepository @Inject constructor(
         val isEssential = (category == AppCategory.ESSENTIAL)
         val isBlocked = (category == AppCategory.MANAGED)
         val currentApp = installedAppDao.getApp(packageName)
+        val currentRule = appRuleDao.getRule(packageName)
+        val familyId = currentRule?.familyId
 
         // Persist rule override
         val rule = AppRuleEntity(
@@ -156,7 +162,9 @@ class DefaultAppRepository @Inject constructor(
             isAlwaysAvailable = isEssential,
             isBlockedInFocus = isBlocked,
             isFavoriteOnHome = currentApp?.isFavoriteOnHome ?: isEssential,
-            classificationSource = ClassificationSource.USER_OVERRIDE
+            classificationSource = ClassificationSource.USER_OVERRIDE,
+            familyId = familyId,
+            quarantineUntil = currentRule?.quarantineUntil
         )
         appRuleDao.upsertRule(rule)
 
@@ -175,6 +183,7 @@ class DefaultAppRepository @Inject constructor(
 
         val currentRule = appRuleDao.getRule(packageName)
         val currentApp = installedAppDao.getApp(packageName)
+        val familyId = currentRule?.familyId
         if (currentApp != null) {
             val rule = AppRuleEntity(
                 packageName = packageName,
@@ -182,7 +191,9 @@ class DefaultAppRepository @Inject constructor(
                 isAlwaysAvailable = currentApp.isEssential,
                 isBlockedInFocus = currentApp.isBlockedInFocus,
                 isFavoriteOnHome = isFavorite,
-                classificationSource = currentRule?.classificationSource ?: ClassificationSource.USER_OVERRIDE
+                classificationSource = currentRule?.classificationSource ?: ClassificationSource.USER_OVERRIDE,
+                familyId = familyId,
+                quarantineUntil = currentRule?.quarantineUntil
             )
             appRuleDao.upsertRule(rule)
         }
@@ -191,26 +202,52 @@ class DefaultAppRepository @Inject constructor(
     override suspend fun onPackageAdded(packageName: String) = withContext(Dispatchers.IO) {
         val app = appScanner.getAppDetails(packageName)
         if (app != null) {
-            val rule = appRuleDao.getRule(packageName)
-            val entity = if (rule != null) {
-                app.toEntity().copy(
-                    category = rule.category,
-                    isEssential = rule.isAlwaysAvailable,
-                    isBlockedInFocus = rule.isBlockedInFocus,
-                    isFavoriteOnHome = rule.isFavoriteOnHome,
-                    classificationSource = rule.classificationSource
-                )
+            val existingRule = appRuleDao.getRule(packageName)
+            val familyId = existingRule?.familyId
+
+            val resolvedRule = if (existingRule != null) {
+                existingRule
             } else {
-                app.toEntity()
+                // New app — evaluate quarantine (M21)
+                val isEssential = AppScanner.isEssentialPackage(packageName, app.label)
+                val qHours = settingsRepository.quarantineHours.first()
+                val qUntil = if (!isEssential && qHours.hours != null) {
+                    System.currentTimeMillis() + qHours.hours!! * 60L * 60L * 1000L
+                } else null
+
+                val newRule = AppRuleEntity(
+                    packageName = packageName,
+                    category = if (isEssential) AppCategory.ESSENTIAL else AppCategory.MANAGED,
+                    isAlwaysAvailable = isEssential,
+                    isBlockedInFocus = !isEssential,
+                    isFavoriteOnHome = isEssential,
+                    classificationSource = ClassificationSource.AUTOMATIC_DEFAULT,
+                    familyId = familyId,
+                    quarantineUntil = qUntil
+                )
+                appRuleDao.upsertRule(newRule)
+                newRule
             }
+
+            val entity = app.toEntity().copy(
+                category = resolvedRule.category,
+                isEssential = resolvedRule.isAlwaysAvailable,
+                isBlockedInFocus = resolvedRule.isBlockedInFocus,
+                isFavoriteOnHome = resolvedRule.isFavoriteOnHome,
+                classificationSource = resolvedRule.classificationSource,
+                familyId = familyId,
+                quarantineUntil = resolvedRule.quarantineUntil,
+                isClone = app.isClone
+            )
             installedAppDao.upsertApp(entity)
             MinimalLog.i(TAG, "Persisted newly added package to Room: ${app.label} ($packageName)")
         }
     }
 
     override suspend fun onPackageRemoved(packageName: String) = withContext(Dispatchers.IO) {
+        // We delete from installed_apps, but PRESERVE app_rules & time limits across uninstalls (M21)
         installedAppDao.deleteApp(packageName)
-        MinimalLog.i(TAG, "Deleted removed package from Room: $packageName")
+        MinimalLog.i(TAG, "Deleted removed package from Room installed_apps: $packageName")
     }
 
     override suspend fun onPackageChanged(packageName: String) = withContext(Dispatchers.IO) {
@@ -234,7 +271,10 @@ private fun InstalledApp.toEntity(): InstalledAppEntity = InstalledAppEntity(
     iconKey = iconKey,
     lastUsedTimestamp = lastUsedTimestamp,
     installedTimestamp = installedTimestamp,
-    classificationSource = ClassificationSource.AUTOMATIC_DEFAULT
+    classificationSource = ClassificationSource.AUTOMATIC_DEFAULT,
+    familyId = familyId,
+    quarantineUntil = quarantineUntil,
+    isClone = isClone
 )
 
 private fun InstalledAppEntity.toModel(): InstalledApp = InstalledApp(
@@ -248,5 +288,8 @@ private fun InstalledAppEntity.toModel(): InstalledApp = InstalledApp(
     isFavoriteOnHome = isFavoriteOnHome,
     iconKey = iconKey,
     lastUsedTimestamp = lastUsedTimestamp,
-    installedTimestamp = installedTimestamp
+    installedTimestamp = installedTimestamp,
+    familyId = familyId,
+    quarantineUntil = quarantineUntil,
+    isClone = isClone
 )

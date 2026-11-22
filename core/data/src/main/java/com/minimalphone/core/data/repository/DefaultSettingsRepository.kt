@@ -8,7 +8,10 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
+import com.minimalphone.core.model.QuarantineHours
+import com.minimalphone.core.model.SettingsGuardMode
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -33,9 +36,12 @@ class DefaultSettingsRepository @Inject constructor(
         val ADAPTIVE_FRICTION_ENABLED = booleanPreferencesKey("adaptive_friction_enabled")
         val DEFAULT_FOCUS_DURATION = intPreferencesKey("default_focus_duration")
         val LOCAL_ANALYTICS_ENABLED = booleanPreferencesKey("local_analytics_enabled")
-        val APP_THEME = androidx.datastore.preferences.core.stringPreferencesKey("app_theme")
+        val APP_THEME = stringPreferencesKey("app_theme")
         val DUMB_MODE_ENABLED = booleanPreferencesKey("dumb_mode_enabled")
         val AUTO_GRAYSCALE_IN_FOCUS = booleanPreferencesKey("auto_grayscale_in_focus")
+        val SETTINGS_GUARD_MODE = stringPreferencesKey("settings_guard_mode")
+        val QUARANTINE_HOURS = stringPreferencesKey("quarantine_hours")
+        val UNINSTALL_LOCK_ENABLED = booleanPreferencesKey("uninstall_lock_enabled")
     }
 
     override val isOnboardingCompleted: Flow<Boolean> = dataStore.data
@@ -94,6 +100,40 @@ class DefaultSettingsRepository @Inject constructor(
             preferences[PreferencesKeys.AUTO_GRAYSCALE_IN_FOCUS] ?: false
         }
 
+    override val settingsGuardMode: Flow<SettingsGuardMode> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            val value = preferences[PreferencesKeys.SETTINGS_GUARD_MODE]
+            try {
+                if (value != null) SettingsGuardMode.valueOf(value) else SettingsGuardMode.OFF
+            } catch (_: Exception) {
+                SettingsGuardMode.OFF
+            }
+        }
+
+    override val quarantineHours: Flow<QuarantineHours> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            val value = preferences[PreferencesKeys.QUARANTINE_HOURS]
+            try {
+                if (value != null) QuarantineHours.valueOf(value) else QuarantineHours.TWENTY_FOUR
+            } catch (_: Exception) {
+                QuarantineHours.TWENTY_FOUR
+            }
+        }
+
+    override val uninstallLockEnabled: Flow<Boolean> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.UNINSTALL_LOCK_ENABLED] ?: false
+        }
+
     override suspend fun setOnboardingCompleted(completed: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.ONBOARDING_COMPLETED] = completed
@@ -133,6 +173,24 @@ class DefaultSettingsRepository @Inject constructor(
     override suspend fun setAutoGrayscaleInFocusEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.AUTO_GRAYSCALE_IN_FOCUS] = enabled
+        }
+    }
+
+    override suspend fun setSettingsGuardMode(mode: SettingsGuardMode) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SETTINGS_GUARD_MODE] = mode.name
+        }
+    }
+
+    override suspend fun setQuarantineHours(hours: QuarantineHours) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.QUARANTINE_HOURS] = hours.name
+        }
+    }
+
+    override suspend fun setUninstallLockEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.UNINSTALL_LOCK_ENABLED] = enabled
         }
     }
 }

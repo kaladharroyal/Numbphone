@@ -3,6 +3,8 @@ package com.minimalphone.core.data.db
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.minimalphone.core.data.db.converters.MinimalConverters
 import com.minimalphone.core.data.db.dao.AppRuleDao
 import com.minimalphone.core.data.db.dao.AppTimeLimitDao
@@ -46,7 +48,7 @@ import com.minimalphone.core.data.db.entity.QuickContactEntity
         QuickContactEntity::class,
         AppTimeLimitEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(MinimalConverters::class)
@@ -66,5 +68,16 @@ abstract class MinimalPhoneDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "minimal_phone.db"
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE app_rules ADD COLUMN familyId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE app_rules ADD COLUMN quarantineUntil INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE installed_apps ADD COLUMN familyId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE installed_apps ADD COLUMN quarantineUntil INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE installed_apps ADD COLUMN isClone INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE exit_attempts ADD COLUMN route TEXT NOT NULL DEFAULT 'FOCUS_SESSION'")
+            }
+        }
     }
 }

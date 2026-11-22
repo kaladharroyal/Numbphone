@@ -20,7 +20,10 @@ data class InstalledAppEntity(
     val iconKey: String? = null,
     val lastUsedTimestamp: Long = 0L,
     val installedTimestamp: Long = System.currentTimeMillis(),
-    val classificationSource: ClassificationSource = ClassificationSource.AUTOMATIC_DEFAULT
+    val classificationSource: ClassificationSource = ClassificationSource.AUTOMATIC_DEFAULT,
+    val familyId: String? = null,
+    val quarantineUntil: Long? = null,
+    val isClone: Boolean = false
 )
 
 @Entity(tableName = "app_rules")
@@ -32,7 +35,9 @@ data class AppRuleEntity(
     val isFavoriteOnHome: Boolean,
     val customLabel: String? = null,
     val classificationSource: ClassificationSource = ClassificationSource.USER_OVERRIDE,
-    val updatedTimestamp: Long = System.currentTimeMillis()
+    val updatedTimestamp: Long = System.currentTimeMillis(),
+    val familyId: String? = null,
+    val quarantineUntil: Long? = null
 )
 
 @Entity(tableName = "focus_sessions")
@@ -70,7 +75,8 @@ data class ExitAttemptEntity(
     val completedFrictionSeconds: Int,
     val timestamp: Long = System.currentTimeMillis(),
     val isSuccessfulExit: Boolean = false,
-    val exitReason: String? = null
+    val exitReason: String? = null,
+    val route: String = "FOCUS_SESSION"
 )
 
 @Entity(tableName = "focus_goals")
@@ -98,7 +104,6 @@ data class EssentialAppEntity(
     val isSystemDefault: Boolean = false,
     val addedTimestamp: Long = System.currentTimeMillis()
 )
-
 
 /**
  * Tracks how long each app was used on a given calendar day.

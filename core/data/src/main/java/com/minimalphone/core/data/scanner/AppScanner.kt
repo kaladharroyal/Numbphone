@@ -31,33 +31,43 @@ class AppScanner @Inject constructor(
 
         try {
             if (launcherApps != null && userManager != null) {
+                val myUserHandle = Process.myUserHandle()
                 val profiles = userManager.userProfiles
                 for (profile in profiles) {
+                    val isOtherProfile = profile != myUserHandle
                     val activityList: List<LauncherActivityInfo> = launcherApps.getActivityList(null, profile)
                     for (activityInfo in activityList) {
                         val pkgName = activityInfo.applicationInfo.packageName
                         if (pkgName == context.packageName) {
-                            // Don't include ourselves in the list of launched apps
                             continue
                         }
+
+                        val isAlreadySeen = seenPackages.contains(pkgName)
                         seenPackages.add(pkgName)
 
-                        val label = activityInfo.label.toString()
+                        var rawLabel = activityInfo.label.toString()
+                        val isClone = isOtherProfile || isAlreadySeen || isCloneIndicator(pkgName)
+                        if (isClone && !rawLabel.contains("(clone)", ignoreCase = true) && !rawLabel.contains("(work)", ignoreCase = true)) {
+                            rawLabel = if (isOtherProfile) "$rawLabel (work)" else "$rawLabel (clone)"
+                        }
+
                         val isSystem = (activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                        val isEssential = isEssentialPackage(pkgName, label)
+                        val isEssential = isEssentialPackage(pkgName, rawLabel)
+                        val source = if (isWebApk(pkgName)) ClassificationSource.WEB_APP else ClassificationSource.AUTOMATIC_DEFAULT
 
                         result.add(
                             InstalledApp(
                                 packageName = pkgName,
                                 activityName = activityInfo.componentName.className,
-                                label = label,
+                                label = rawLabel,
                                 category = if (isEssential) AppCategory.ESSENTIAL else AppCategory.MANAGED,
                                 isSystemApp = isSystem,
                                 isEssential = isEssential,
                                 isBlockedInFocus = !isEssential,
                                 isFavoriteOnHome = isEssential,
                                 lastUsedTimestamp = 0L,
-                                installedTimestamp = System.currentTimeMillis()
+                                installedTimestamp = System.currentTimeMillis(),
+                                isClone = isClone
                             )
                         )
                     }
@@ -103,7 +113,8 @@ class AppScanner @Inject constructor(
                             isBlockedInFocus = !isEssential,
                             isFavoriteOnHome = isEssential,
                             lastUsedTimestamp = 0L,
-                            installedTimestamp = System.currentTimeMillis()
+                            installedTimestamp = System.currentTimeMillis(),
+                            isClone = isCloneIndicator(pkgName)
                         )
                     )
                 }
@@ -129,6 +140,7 @@ class AppScanner @Inject constructor(
             val activityName = launchIntent?.component?.className ?: ""
             val isSystem = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
             val isEssential = isEssentialPackage(packageName, label)
+            val isClone = isCloneIndicator(packageName)
 
             InstalledApp(
                 packageName = packageName,
@@ -138,7 +150,8 @@ class AppScanner @Inject constructor(
                 isSystemApp = isSystem,
                 isEssential = isEssential,
                 isBlockedInFocus = !isEssential,
-                isFavoriteOnHome = isEssential
+                isFavoriteOnHome = isEssential,
+                isClone = isClone
             )
         } catch (e: Exception) {
             MinimalLog.w(TAG, "App details not found for $packageName", e)
@@ -149,16 +162,21 @@ class AppScanner @Inject constructor(
     companion object {
         private const val TAG = "AppScanner"
 
-        /**
-         * The 6 curated essential apps shown on the Minimal Home Screen by default.
-         * Detected by label OR package name to be OEM-agnostic.
-         *   1. Phone / Dialer
-         *   2. Messages / SMS
-         *   3. Camera
-         *   4. Clock / Alarm
-         *   5. Contacts
-         *   6. Calendar
-         */
+        fun isWebApk(packageName: String): Boolean {
+            val lower = packageName.lowercase()
+            return lower.startsWith("org.chromium.webapk.") ||
+                   lower.startsWith("org.chromium.") ||
+                   lower.endsWith(".webapk")
+        }
+
+        fun isCloneIndicator(packageName: String): Boolean {
+            val lower = packageName.lowercase()
+            return lower.contains(".clone.") || lower.contains(".work.") ||
+                   lower.contains(".dual.") || lower.contains(".second.") ||
+                   lower.contains(".parallel.") ||
+                   lower.endsWith(".clone") || lower.endsWith(".work")
+        }
+
         fun isEssentialPackage(packageName: String, label: String): Boolean {
             val lowerPkg = packageName.lowercase()
             val lowerLabel = label.lowercase()
