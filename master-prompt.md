@@ -1,1794 +1,667 @@
 # MASTER BUILD PROMPT
 
-## Project: Minimal Phone — Focus & Digital Wellbeing Android Launcher
+## Project: NumbPhone — Focus & Digital Wellbeing Android Launcher
 
 You are an expert Android engineer, Kotlin architect, UI/UX engineer, and QA engineer.
 
-Your task is to design and BUILD a production-quality Android application called:
+Your task is to design, BUILD, maintain, and expand a production-quality Android application called:
 
-**Minimal Phone**
+**NumbPhone** (formerly Minimal Phone)
 
-The application is a minimalist Android launcher designed to transform a normal Android smartphone into a controlled, distraction-resistant "dumb phone" experience.
+The application is a distraction-resistant minimalist Android launcher and digital wellbeing application designed to transform modern smartphones into intentional tools. It provides the simplicity, calm, and focus of a "dumb phone" while preserving the reliability of essential communication and utility tools.
 
-The application must replace the default Android home screen, display only permitted applications, provide focus sessions, block distracting applications, track usage, and introduce deliberate exit friction when the user attempts to leave an active focus session.
+The application replaces the default Android home screen, displays only permitted applications, enforces daily app usage limits, schedules automated focus sessions, blocks distracting applications, provides notification digests, tracks usage analytics, and introduces deliberate exit friction when the user attempts to leave an active focus session or exceed daily time limits.
 
 Do NOT build this as a simple demo or mockup.
 
-Build a real Android application using real Android APIs, real persistence, real services, and a modular architecture.
+Build a real, robust, modular Android application using modern Android APIs, real Room database persistence, DataStore preferences, system services, and clean multi-module architecture.
 
 ---
 
 # 1. PRODUCT VISION
 
-The core philosophy is:
+The core philosophy of NumbPhone is:
 
-> Make intentional actions easy and impulsive actions deliberate.
+> *"Make intentional actions easy and impulsive actions deliberate."*
 
-The application should NOT attempt to permanently trap the user inside the launcher or make the device impossible to recover.
+Modern smartphones are engineered for addiction through infinite feeds, red notification badges, colorful icon grids, and friction-free impulsive app launches. NumbPhone breaks this cycle through a dual-defense architecture:
 
-Instead, it should make distraction difficult while always preserving essential functionality such as:
+1. **Proactive Friction**: Typography-first monochrome interface, removal of distracting feeds/badges, hidden status bar (Immersive Mode), and intentional app pinning.
+2. **Enforced Boundaries**: Daily app usage budgets with auto-closing countdown alerts, strict focus sessions with adaptive exit delays, background notification digests, and system-level display desaturation (Grayscale mode).
 
-* Phone
-* Emergency calling
-* Messages/SMS
+The application does NOT attempt to permanently trap the user inside the launcher or make the device impossible to recover. Essential functionality is always guaranteed:
+
+* Emergency calling (112, 911, SOS launchers)
+* Phone & speed-dial quick contacts
+* Messages / SMS
 * Camera
-* Clock
+* Clock & Alarms
 * Contacts
 * Settings
-* Navigation/maps where configured
-* Other explicitly designated essential applications
+* Navigation / Maps where configured
+* Explicitly designated user essential applications
 
-On stock Android, acknowledge that users can ultimately disable permissions, change the default launcher, uninstall the application, or otherwise override restrictions.
+On stock Android, users can ultimately disable permissions or switch launchers. The product therefore focuses on:
 
-The product should therefore focus on:
-
-1. Strong friction
-2. Reliable blocking
-3. Minimal UI
-4. Bypass resistance
-5. Clear user intent
-6. Essential-app accessibility
+1. **Deliberate Friction**: Calibrated countdown delays (5s, 30s, 2m, 10m) giving users time to reconsider impulsive urges.
+2. **Daily Usage Limits**: Per-app time budgets with 10-second countdown warnings, automatic app closing, and lock until tomorrow.
+3. **Reliable Interception**: Central launch pipeline backed by an Accessibility Service backstop.
+4. **Banking App Security**: Zero window-content inspection (`canRetrieveWindowContent="false"`) ensuring high-security banking/financial apps run without conflict.
+5. **Calm Minimalist UI**: High-contrast typography, zero icon grids, and OLED black / E-ink paper / warm amber themes.
+6. **Local-First Privacy**: 100% on-device processing with zero telemetry, zero cloud tracking, and local JSON backup/restore.
 
 ---
 
-# 2. PRIMARY TARGET USER
+# 2. BRAND IDENTITY & ASSETS
 
-The initial target audience is:
+NumbPhone uses a distinctive brand visual system optimized for Android launchers, system contexts, documentation, and the Google Play Store:
 
-## Students
+| Version | Asset Location | Target / Usage Context | Purpose |
+|:---|:---:|:---|:---|
+| **1. Flat Version** | `icons/flat version.png` | App branding, README, splash screen, GitHub | Clean primary brand artwork |
+| **2. Monochrome Version** | `icons/monochrome version.png` | Android 13+ Themed Icons (`ic_launcher_monochrome`) | Integrates with Material You themed icons |
+| **3. Black & White Version** | `icons/black and white.png` | Marketing, high-contrast dark/light documentation | Flexible brand variant |
+| **4. Adaptive Android Icon** | `icons/adaptive android icon.png` | Android Launcher Adaptive Icon (`mipmap/ic_launcher`) | Primary icon displayed in system launcher settings |
+| **5. Play Store 512×512** | `icons/512×512 Play Store version.png` | Google Play Store store listing (`docs/ic_playstore_512.png`) | High-resolution store listing graphic |
 
-Especially students preparing for examinations who want to prevent:
+Brand drawables inside the application:
+- `core/ui/src/main/res/drawable/numbphone_logo.png`: In-app headers and onboarding branding.
+- `core/ui/src/main/res/drawable/numbphone_brand_bw.png`: High-contrast watermark and about dialogs.
 
+---
+
+# 3. PRIMARY TARGET USER
+
+The primary target audience includes:
+
+## Students & Examinees
+Students preparing for competitive examinations who need to eliminate distractions from:
 * YouTube
-* Instagram
+* Instagram & Reels
 * TikTok
-* X/Twitter
+* X / Twitter
 * Games
-* Reddit
-* Entertainment applications
+* Reddit & Forums
+* Streaming & Entertainment
 
-from interrupting study sessions.
+## Knowledge Workers & Engineers
+Software developers, researchers, and writers who require sustained deep-work periods without notification pings and mindless phone checking.
 
-The architecture must remain general enough for:
-
-* Software engineers
-* Professionals
-* Minimalists
-* Parents configuring controlled environments
-
-but the initial UX should prioritize students.
+## Digital Minimalists
+Users seeking a permanent dumb-phone lifestyle on capable smartphone hardware without sacrificing modern camera quality, UPI/banking tools, or navigation.
 
 ---
 
-# 3. CORE USER EXPERIENCE
+# 4. CORE USER EXPERIENCE FLOW
 
-After installation:
+The user onboarding and daily flow is structured as follows:
 
 ```text
-Install
+Install NumbPhone
   ↓
-Onboarding
+Interactive 4-Step Onboarding Wizard
+  ├── 1. Philosophy & Purpose ("Reclaim your focus. Pure monochrome simplicity.")
+  ├── 2. System Permissions (Usage Stats, Accessibility Service, Default Launcher)
+  ├── 3. Core Essentials (Auto-pinning 6 essential default apps)
+  └── 4. Ready State ("Your calm, distraction-free environment is configured.")
   ↓
-Set Minimal Phone as default launcher
+Set NumbPhone as Default Launcher (Intent to android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
   ↓
-Grant required permissions
+Dynamic Package Discovery via LauncherApps API
   ↓
-Scan installed applications
+Automatic Classification (Always Available vs. Managed)
   ↓
-Automatically classify applications
-  ↓
-Show minimal home screen
+Launch Minimal Immersive Home Screen (Status bar hidden)
 ```
 
-The home screen should NOT look like a conventional Android launcher.
-
-Do NOT create:
-
-* Traditional app drawer
-* Excessive widgets
-* Decorative UI
-* Ads
-* Social feeds
-* Recommendation feeds
-* Unnecessary animations
-
-The home screen should feel calm and intentional.
-
-Example:
+The home screen displays zero icon grids, zero notification badges, and zero infinite feeds:
 
 ```text
-┌─────────────────────────────┐
-│                             │
-│          10:42 PM           │
-│                             │
-│          Tuesday            │
-│                             │
-│  Phone                      │
-│  Messages                   │
-│  Camera                     │
-│  Maps                       │
-│  Calendar                   │
-│                             │
-│                             │
-│      Focus Mode: OFF        │
-│                             │
-└─────────────────────────────┘
-```
-
-Use Jetpack Compose for the UI.
-
----
-
-# 4. TECHNOLOGY STACK
-
-Use modern Android development practices.
-
-Preferred stack:
-
-* Kotlin
-* Jetpack Compose
-* Material 3 where appropriate
-* AndroidX
-* Room
-* Hilt
-* Coroutines
-* Flow / StateFlow
-* Navigation Compose
-* Gradle Kotlin DSL
-* Version Catalog
-* LauncherApps API
-* PackageManager
-* UsageStatsManager
-* AccessibilityService
-* Foreground Service where required
-* Boot receiver
-* DataStore for lightweight preferences where appropriate
-
-Use the latest stable Android SDK/tooling available in the development environment.
-
-Before implementing APIs that vary by Android version, check the SDK/API level and use appropriate compatibility handling.
-
-Do not use deprecated APIs when a modern supported alternative exists.
-
----
-
-# 5. ARCHITECTURE
-
-Use a clean, modular architecture.
-
-Recommended structure:
-
-```text
-minimal-phone/
-│
-├── docs/
-│   ├── prd.md
-│   ├── architecture.md
-│   ├── permissions.md
-│   ├── testing.md
-│   └── risks.md
-│
-├── app/
-│   └── Application entry point
-│
-├── core/
-│   ├── ui/
-│   ├── model/
-│   ├── data/
-│   ├── domain/
-│   ├── common/
-│   └── di/
-│
-├── feature/
-│   ├── homescreen/
-│   ├── appslist/
-│   ├── focussession/
-│   ├── screentime/
-│   ├── onboarding/
-│   └── settings/
-│
-└── build.gradle.kts
-```
-
-Responsibilities:
-
-### core:model
-
-Models such as:
-
-```text
-InstalledApp
-AppCategory
-FocusSession
-BlockedAttempt
-UsageRecord
-FocusGoal
-ExitAttempt
-AppRule
-```
-
-### core:data
-
-Responsible for:
-
-* Room
-* DataStore
-* PackageManager/LauncherApps integration
-* Repositories
-* Local persistence
-
-### core:domain
-
-Business logic:
-
-* App classification
-* Blocking rules
-* Focus state
-* Exit-friction calculation
-* Session management
-* Bypass detection logic
-
-### core:ui
-
-Shared:
-
-* Typography
-* Theme
-* Buttons
-* Cards
-* Dialogs
-* Countdown components
-* App rows
-* Empty states
-
-### feature:homescreen
-
-The actual launcher home screen.
-
-### feature:appslist
-
-Installed-app management and whitelist UI.
-
-### feature:focussession
-
-Focus creation, activation and management.
-
-### feature:screentime
-
-Usage analytics.
-
-### feature:onboarding
-
-Initial setup and permissions.
-
-### feature:settings
-
-Application configuration.
-
----
-
-# 6. ANDROID LAUNCHER
-
-Register the appropriate Activity as an Android HOME activity.
-
-The application must be selectable as the default launcher.
-
-Implement:
-
-```text
-ACTION_MAIN
-CATEGORY_HOME
-CATEGORY_DEFAULT
-```
-
-Use the correct manifest configuration.
-
-When the user presses the Home button while Minimal Phone is the default launcher, Android should return to Minimal Phone.
-
-The launcher must be functional on a physical Android device.
-
-Do not rely exclusively on an emulator.
-
----
-
-# 7. INSTALLED APPLICATION DISCOVERY
-
-Never hardcode the user's installed-app list.
-
-Use Android's application/package APIs.
-
-Prefer:
-
-```text
-LauncherApps
-```
-
-for launcher-relevant applications and:
-
-```text
-LauncherApps.registerCallback()
-```
-
-to react to changes such as:
-
-* Application installed
-* Application removed
-* Application changed
-
-Use PackageManager where appropriate for additional package/application metadata.
-
-The application list must dynamically reflect the actual device.
-
-Handle:
-
-* Normal apps
-* System apps
-* Work profiles
-* Multiple Android profiles where supported
-* Apps being installed/uninstalled
-
-Do not assume every installed package is launchable.
-
----
-
-# 8. APPLICATION CLASSIFICATION
-
-Every discovered application should be classified.
-
-There are two primary categories:
-
-## ALWAYS AVAILABLE
-
-Examples:
-
-* Phone
-* Messages/SMS
-* Camera
-* Clock
-* Contacts
-* Settings
-* Essential system apps
-* Google apps except YouTube
-
-These are available without restriction.
-
-## MANAGED
-
-Examples:
-
-* YouTube
-* Instagram
-* TikTok
-* X/Twitter
-* Games
-* Reddit
-* Netflix
-* Entertainment applications
-* Other non-essential applications
-
-Managed apps are subject to focus rules.
-
-Classification logic:
-
-```text
-if system app:
-    ALWAYS_AVAILABLE
-
-else if package starts with "com.google."
-    AND package != "com.google.android.youtube":
-    ALWAYS_AVAILABLE
-
-else:
-    MANAGED
-```
-
-However, make the classification system configurable rather than permanently embedding assumptions throughout the code.
-
-Store the classification/rule in a maintainable form.
-
-YouTube MUST remain managed despite being a Google application.
-
----
-
-# 9. HOME SCREEN
-
-The home screen should display only applications that are currently allowed.
-
-There must be NO traditional app drawer in MVP.
-
-Example:
-
-```text
-Phone
-Messages
-Camera
-Chrome
-Calendar
-```
-
-If an application is blocked during Focus Mode:
-
-```text
-Do NOT display it on the home screen.
-```
-
-The user should not be encouraged to browse applications.
-
-Each visible application row should launch the application through a proper Android Intent.
-
-Do not fake application launching.
-
----
-
-# 10. APP LAUNCH PIPELINE
-
-All launches initiated from the launcher must pass through a central launch decision.
-
-Conceptually:
-
-```text
-User taps app
-      ↓
-openApp()
-      ↓
-Check application rule
-      ↓
-Is Always Available?
-      ├── YES → Launch
-      │
-      └── NO
-           ↓
-       Is Focus Mode active?
-           ├── NO → Launch
-           │
-           └── YES
-                ↓
-              BLOCK
-                ↓
-          Show friction UI
-```
-
-Do NOT scatter blocking logic across multiple UI components.
-
-Create a central domain-level decision mechanism.
-
-For example:
-
-```text
-AppLaunchDecision
-```
-
-with states such as:
-
-```text
-ALLOW
-BLOCK
-SHOW_FRICTION
+┌─────────────────────────────────────────────────────────┐
+│ [📊 Analytics]     [⚙️ Quick Controls]    [⚙️ Settings] │
+│                                                         │
+│                        10:42 PM                         │
+│                    Tuesday, Oct 24                      │
+│                                                         │
+│  [📞 Mom]   [📞 Alex]   [📞 Clinic]   (+ Quick Contacts) │
+│                                                         │
+│  Phone                                                  │
+│  Messages                                               │
+│  Camera                                                 │
+│  Clock                                                  │
+│  Contacts                                               │
+│  Maps                                                   │
+│                                                         │
+│  + Add app                                              │
+│                                                         │
+│                                                         │
+│                    Focus Mode: OFF                      │
+│               [ Tap to Start Focus ]                    │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-# 11. FOCUS MODE
+# 5. TECHNOLOGY STACK
 
-Users must be able to create a focus session.
+NumbPhone is built using modern Android development practices, ensuring high performance, low battery footprint, and clean separation of concerns:
 
-A focus session contains:
-
-```text
-Session ID
-Start time
-End time
-Duration
-Focus goal
-Blocked applications/rules
-Status
-Number of bypass attempts
-```
-
-Example:
-
-```text
-Study Session
-
-Goal:
-"Complete Machine Learning Unit 3"
-
-Duration:
-2 hours
-
-Start:
-8:00 PM
-
-End:
-10:00 PM
-```
-
-When active:
-
-```text
-Focus Mode = ON
-```
-
-Managed applications are blocked.
-
-Always Available applications remain accessible.
+* **Language**: Kotlin 2.0+ (Strict type safety, coroutines, sealed interfaces)
+* **UI Toolkit**: Jetpack Compose & Material 3 (Monochrome design system, dynamic theming)
+* **Dependency Injection**: Dagger Hilt (Multi-module DI containers)
+* **Local Persistence**: Room Database (SQLite with type converters and reactive Flows)
+* **Lightweight Preferences**: Jetpack DataStore Preferences (Settings, theming, onboarding flags)
+* **Concurrency**: Kotlin Coroutines & Reactive `StateFlow` / `SharedFlow`
+* **Navigation**: Navigation Compose with type-safe routing
+* **Android OS APIs**:
+  - `LauncherApps` API (Dynamic app detection, install/uninstall callbacks)
+  - `PackageManager` (Metadata, component resolution, launch intents)
+  - `UsageStatsManager` (Real-time screen-time and app launch tracking)
+  - `AccessibilityService` (Non-intrusive backstop for bypass protection and daily limit auto-close)
+  - `NotificationListenerService` (`MinimalNotificationListenerService` for notification digest)
+  - `AlarmManager` (`SCHEDULE_EXACT_ALARM`, `USE_EXACT_ALARM` for scheduled focus sessions)
+  - `WindowInsetsControllerCompat` (Immersive Full-Screen mode hiding status bar)
+  - `PowerManager` (`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`)
+  - `SecureSettings` / Display API (`WRITE_SECURE_SETTINGS` for system grayscale)
+* **Build & Release Optimization**: Gradle Kotlin DSL, Version Catalog (`libs.versions.toml`), ProGuard / R8 code shrinking and resource minification enabled.
 
 ---
 
-# 12. FOCUS MODES
+# 6. MODULAR MULTI-MODULE ARCHITECTURE
 
-Implement three conceptual levels.
+NumbPhone enforces Clean Architecture across decoupled Gradle modules:
 
-## LIGHT
+```text
+                          NUMBPHONE ARCHITECTURE
+                                    │
+                           ┌────────┴────────┐
+                           │                 │
+                        UI Layer          Android
+                     (Jetpack Compose)     APIs
+                           │                 │
+                     ┌─────┴─────┐     ┌────┴────────────┐
+                     ↓           ↓     ↓                 ↓
+                 Launcher    Settings  LauncherApps    UsageStats
+                                       Accessibility   NotificationListener
+                                       AlarmManager    Boot/Power
+                     └──────┬───────────────┘
+                            ↓
+                        DOMAIN LAYER (Pure Business Logic)
+                            │
+       ┌──────────┬─────────┼──────────────┬──────────────┐
+       ↓          ↓         ↓              ↓              ↓
+  Launch Engine Focus   Time Limit   Bypass Engine Recovery System
+             Scheduler    Engine
+       │          │         │              │              │
+       └──────────┴─────────┼──────────────┴──────────────┘
+                            ↓
+                         DATA LAYER
+                            │
+                     ┌──────┴──────┐
+                     ↓             ↓
+                   Room         DataStore
+```
 
-* Managed apps can be restricted
-* Minimal exit friction
-* Essential apps always available
+### Module Responsibilities:
 
-## STRICT
-
-* Managed apps blocked
-* Stronger exit friction
-* Apps hidden from launcher
-* Bypass routes monitored
-
-## DEEP FOCUS
-
-* Strongest friction
-* Managed apps blocked
-* No changing rules during session
-* Distracting apps hidden
-* Bypass routes monitored
-* Optional notification reduction
-* Exit requires deliberate confirmation
-
-Do not make Deep Focus irreversible.
+| Module | Purpose & Components |
+|:---|:---|
+| **`:app`** | Application entry point (`MinimalPhoneApplication`), `MainActivity`, navigation graph (`MinimalPhoneNavHost`), services (`MinimalAccessibilityService`, `MinimalNotificationListenerService`), receivers (`MinimalBootReceiver`, `FocusScheduleReceiver`), and ProGuard release configuration. |
+| **`:core:model`** | Pure Kotlin domain data models: `InstalledApp`, `AppCategory`, `AppRule`, `FocusSession`, `FocusMode`, `BlockedAttempt`, `ExitAttempt`, `FocusGoal`, `AppTimeLimit`, `DailyAppUsage`, `FocusPreset`, `FocusSchedule`, `DigestNotification`, `QuickContact`, `AppTheme`, `AppLaunchDecision`. |
+| **`:core:common`** | Coroutine dispatchers, Result wrappers, logging abstractions (`MinimalLog`), `AccessibilityHelper`, `GrayscaleHelper`, `DndHelper`, `SystemHealthHelper`. |
+| **`:core:data`** | Room database (`MinimalPhoneDatabase`), DAOs, `DefaultAppRepository`, `DefaultFocusSessionRepository`, `DefaultBlockedAttemptRepository`, `DefaultExitAttemptRepository`, `DefaultSettingsRepository`, `DefaultUsageStatsRepository`, `AppTimeLimitRepository`, `DefaultScheduleRepository`, `DefaultNotificationDigestRepository`, `DefaultContactRepository`, `DefaultEssentialAppRepository`, `AppScanner`. |
+| **`:core:domain`** | Business logic use cases: `LaunchEngine` (`EvaluateAppLaunchUseCase`), `FocusEngine`, `FocusScheduler`, `BypassEngine`, `TimeLimitExpiryNotifier`, `ExitFrictionEngine`, `EmergencyAccessManager`, `LauncherPolicy`, `RuleEngine`, `BootRecoveryEngine`, `ExportBackupJsonUseCase`, `ImportBackupJsonUseCase`, `GetBehavioralInsightsUseCase`, `GetWeeklyWellbeingReportUseCase`. |
+| **`:core:ui`** | Design system: `MinimalTheme`, `MinimalTypography`, shared dialogs (`BlockedAppDialog`, `ExitFrictionDialog`, `IntentReflectionDialog`, `SetTimeLimitDialog`, `TimeLimitExpiredDialog`), and UI components (`MinimalClockHeader`, `FocusStatusIndicator`, `MinimalAppItemRow`). |
+| **`:feature:homescreen`** | Immersive launcher home screen: dynamic clock, quick contacts row, filtered allowed apps list, "+ Add app" button, settings gear, quick control & notification panel, active session indicator. |
+| **`:feature:appslist`** | App management & classification: search bar with instant clear, filter chips (All, Home Apps, Always Available), per-app daily time limit dialog, focus block toggle, home pinning. |
+| **`:feature:focussession`** | Focus session manager: quick presets (Sprint, Deep Work, Exam), recurring weekly schedules, custom goal setup, active session countdown, adaptive friction exit flow. |
+| **`:feature:screentime`** | Screen-time metrics: daily total usage, category breakdown, per-app usage with direct time limit shortcuts, behavioral insights, and blocked impulse attempt history. |
+| **`:feature:onboarding`** | 4-step first-run wizard: philosophy, runtime permission requests, default launcher setup, and core essential app confirmation. |
+| **`:feature:settings`** | Categorized settings hub: Appearance & Themes, Focus & Detox, App Limits & Whitelist, System & Diagnostics ("NumbPhone Health"), Data Portability (JSON backup/restore), and Google Form suggestions link. |
 
 ---
 
-# 13. EXIT FRICTION
+# 7. ANDROID LAUNCHER & IMMERSIVE HOME SCREEN
 
-This is one of the core product features.
-
-Do NOT simply provide:
-
-```text
-Disable Focus Mode → OFF
+### Manifest HOME Activity
+`MainActivity` is declared in `app/src/main/AndroidManifest.xml` with:
+```xml
+<activity
+    android:name=".MainActivity"
+    android:exported="true"
+    android:launchMode="singleTask"
+    android:clearTaskOnLaunch="true"
+    android:stateNotNeeded="true"
+    android:showWhenLocked="true"
+    android:turnScreenOn="true"
+    android:showForAllUsers="true"
+    android:theme="@style/Theme.MinimalPhone">
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.HOME" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.LAUNCHER" />
+    </intent-filter>
+</activity>
 ```
 
-Instead:
-
-```text
-User attempts to exit
-        ↓
-Show exit-friction screen
-        ↓
-Display focus goal
-        ↓
-Display remaining time
-        ↓
-Require deliberate action
+### Immersive Full-Screen Mode
+The Home screen hides the Android status bar using `WindowInsetsControllerCompat` to eliminate notification bar temptation:
+```kotlin
+val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+insetsController.hide(WindowInsetsCompat.Type.statusBars())
 ```
+When leaving the home screen to open apps or settings, the status bar is cleanly restored.
 
-Example:
+### Essential Default Apps Auto-Pinning
+On first launch, NumbPhone automatically identifies and pins 6 essential system apps to the home screen:
+1. Phone (`Intent.ACTION_DIAL`)
+2. Messages (`Intent.CATEGORY_APP_MESSAGING`)
+3. Camera
+4. Clock / Alarm (`android.intent.action.SET_ALARM`)
+5. Contacts (`Intent.CATEGORY_APP_CONTACTS`)
+6. Settings
 
-```text
-┌───────────────────────────────┐
-│                               │
-│       Leave Focus Mode?       │
-│                               │
-│ Your goal:                    │
-│ "Prepare for ML examination"  │
-│                               │
-│ 47 minutes remaining          │
-│                               │
-│       Wait: 30 seconds        │
-│                               │
-│           27...               │
-│                               │
-│       [ Continue ]            │
-│                               │
-│       [ Exit Anyway ]         │
-│                               │
-└───────────────────────────────┘
-```
+### Quick Control Center & Notification Panel
+Tapping the header clock or the center tune icon opens a minimalist control overlay displaying:
+- Current DND status and quick toggle.
+- System Grayscale mode status.
+- Notification Digest feed with unread count badge.
+- Quick navigation to Diagnostics.
 
-The UI should never shame or insult the user.
+### "+ Add App" Button
+At the bottom of the home screen app list, an "+ Add app" button allows instant navigation to App Rules & Classification to pin/unpin apps without drilling into settings (automatically hidden in Dumb Mode).
 
 ---
 
-# 14. ADAPTIVE EXIT FRICTION
+# 8. INSTALLED APP DISCOVERY & TAXONOMY
 
-Track bypass attempts per focus session.
+Never hardcode package lists. Use Android system APIs:
+* **`LauncherApps`**: Retrieves launchable activities for the current user profile.
+* **`LauncherApps.registerCallback()`**: Reacts dynamically to `onPackageAdded`, `onPackageRemoved`, and `onPackageChanged`.
+* **`PackageManager`**: Resolves labels, categories, and system flags.
 
-Suggested progression:
+### Automatic Classification Logic
+1. **Always Available (Essential)**:
+   - System Emergency dialers (`EmergencyAccessManager.SYSTEM_EMERGENCY_PACKAGES`)
+   - Intent-resolved essential categories (Dialer, SMS, Contacts, Clock, Calendar)
+   - User-designated essential apps in `essential_apps` table
+   - Non-entertainment Google utility apps (e.g., Maps, Drive)
+2. **Managed**:
+   - Social media (Instagram, TikTok, X, Facebook, Reddit)
+   - Video & Entertainment (YouTube, Netflix, Prime Video, Twitch)
+   - Games and leisure applications
+   - Any app assigned a daily usage limit or blocked in focus sessions
 
-```text
-1st attempt → 5 seconds
-2nd attempt → 30 seconds
-3rd attempt → 2 minutes
-4th attempt → 10 minutes
-```
+*Note: YouTube is strictly classified as MANAGED despite having a `com.google.` package name.*
 
-Make this configurable.
-
-The system should never create an infinite lockout.
-
-Do not use punishment language.
-
-Instead communicate:
-
-> "You chose a focus session. Take a moment before leaving."
-
----
-
-# 15. FOCUS GOALS
-
-Before starting a focus session, allow the user to specify:
-
-```text
-What are you focusing on?
-
-Study
-Coding
-Reading
-Work
-Sleep
-Custom
-```
-
-Allow custom text.
-
-Example:
-
-```text
-Goal:
-"Finish my DBMS revision"
-```
-
-If the user attempts to exit, show that goal.
-
-This creates a connection between the user's original intention and the exit decision.
+### App Filtering (`AppListFilter`)
+In the App Management screen, apps can be filtered via horizontal chips:
+- **`ALL`**: All installed launchable applications.
+- **`HOME`**: Only apps currently pinned to the Home Screen.
+- **`ESSENTIAL`**: Apps designated as Always Available.
 
 ---
 
-# 16. "WHY ARE YOU OPENING THIS?" FEATURE
+# 9. CENTRAL APP LAUNCH PIPELINE
 
-When a user attempts to access a blocked application, optionally ask:
-
-```text
-Why do you want to open this?
-
-○ Important
-○ Just checking
-○ I'm bored
-○ Someone sent me something
-○ Other
-```
-
-Record the response locally.
-
-Store:
+All app launches initiated from the launcher or quick controls pass through a domain-level decision pipeline:
 
 ```text
-timestamp
-app
-focusSession
-reason
-```
-
-This will later support behavioral analytics.
-
-Do not upload this information anywhere in MVP.
-
-Keep it local-first.
-
----
-
-# 17. BYPASS PROTECTION
-
-The launcher itself cannot control every Android app-opening route.
-
-Implement AccessibilityService as a backstop.
-
-Potential bypass routes include:
-
-```text
-Notification tap
-Deep link
-Recent Apps
-External Intent
-Other app launching a managed application
-```
-
-Architecture:
-
-```text
-                  Android OS
-                      │
-        ┌─────────────┼─────────────┐
-        ↓             ↓             ↓
-    Launcher      Notification   External Intent
-        │             │             │
-        └─────────────┼─────────────┘
+User taps app row
+       ↓
+LaunchAppUseCase()
+       ↓
+EvaluateAppLaunchUseCase()
+       ↓
+Is Emergency or Essential App?
+       ├── YES → AppLaunchDecision.EmergencyAllow → Launch Intent
+       │
+       └── NO
+            ↓
+       Is Daily Time Limit Exceeded?
+            ├── YES → AppLaunchDecision.Block ("Daily Limit Exceeded")
+            │
+            └── NO
+                 ↓
+            Is Focus Mode Active?
+                 ├── NO → AppLaunchDecision.Allow → Launch Intent
+                 │
+                 └── YES
                       ↓
-              Bypass Protection
-                      ↓
-              Managed application?
-                 /           \
-               YES            NO
-                ↓              ↓
-              Block          Allow
-```
-
-Use AccessibilityService ONLY for the backstop.
-
-Do not route every normal launcher tap through AccessibilityService.
-
-Normal launcher launches should be handled directly through the launcher's own decision logic.
-
-This minimizes unnecessary complexity and reduces dependence on Accessibility for the common path.
-
----
-
-# 18. ACCESSIBILITY SERVICE
-
-Implement a real AccessibilityService.
-
-It should:
-
-1. Detect relevant foreground/window changes.
-2. Determine the package currently in the foreground.
-3. Check whether that package is managed.
-4. Check whether Focus Mode is active.
-5. If blocked, return the user to Minimal Phone or otherwise prevent continued access using supported Android behavior.
-
-Optimize aggressively.
-
-Do NOT process every accessibility event unnecessarily.
-
-Filter events by relevant event types and package information.
-
-Avoid:
-
-* Infinite loops
-* Excessive CPU usage
-* Memory leaks
-* Unnecessary logging
-* Accessibility abuse
-
-Clearly explain to the user why Accessibility permission is needed.
-
----
-
-# 19. USAGE TRACKING
-
-Use:
-
-```text
-UsageStatsManager
-```
-
-to retrieve application usage data.
-
-Track:
-
-* App
-* Start/foreground time where available
-* Duration
-* Daily usage
-* Focus-session usage
-* Block attempts
-
-MVP analytics:
-
-```text
-Today's usage
-
-YouTube       42 min
-Instagram     31 min
-Chrome        24 min
-Maps           8 min
-```
-
-Also calculate:
-
-```text
-Blocked attempts
-Focus sessions
-Focus completion
-Time spent in managed apps
-```
-
-Do not claim precise real-time tracking if the underlying Android API cannot provide it.
-
----
-
-# 20. ROOM DATABASE
-
-Use Room.
-
-Recommended entities:
-
-```text
-InstalledAppEntity
-
-FocusSessionEntity
-
-AppRuleEntity
-
-BlockedAttemptEntity
-
-ExitAttemptEntity
-
-FocusGoalEntity
-```
-
-Possible relationships:
-
-```text
-FocusSession
-    │
-    ├── BlockedAttempts
-    ├── ExitAttempts
-    └── FocusGoal
-```
-
-Create DAOs and repositories.
-
-Use Flow/StateFlow for reactive UI updates.
-
-Do not place database operations directly inside Composables.
-
----
-
-# 21. SETTINGS
-
-Create a settings screen containing:
-
-```text
-General
-────────────
-Default launcher status
-Always available apps
-
-Focus
-────────────
-Default focus duration
-Default focus mode
-Adaptive friction
-Focus goal
-
-Blocking
-────────────
-Managed apps
-Blocked apps
-Bypass protection
-
-Privacy
-────────────
-Local-only analytics
-Data reset
-
-System
-────────────
-Accessibility status
-Usage access status
-Battery optimization status
-```
-
-The settings screen should clearly show which permissions are missing.
-
----
-
-# 22. ONBOARDING
-
-The onboarding should be short and clear.
-
-Step 1:
-
-```text
-Welcome to Minimal Phone
-```
-
-Explain the purpose.
-
-Step 2:
-
-```text
-Set as Default Launcher
-```
-
-Step 3:
-
-```text
-Enable Usage Access
-```
-
-Step 4:
-
-```text
-Enable Accessibility
-```
-
-Step 5:
-
-```text
-Battery Optimization
-```
-
-Step 6:
-
-```text
-Your apps are ready.
-```
-
-Do not ask for permissions without explaining why.
-
----
-
-# 23. BOOT PERSISTENCE
-
-The application should recover correctly after reboot.
-
-Use:
-
-```text
-BOOT_COMPLETED
-```
-
-where appropriate.
-
-Restore:
-
-* Focus session state
-* App rules
-* Preferences
-* Blocking configuration
-
-Do not assume background services will automatically remain alive on every OEM.
-
-Detect service state and provide guidance.
-
----
-
-# 24. BATTERY / OEM HANDLING
-
-Android manufacturers may kill background processes.
-
-Support common OEM behavior as much as reasonably possible.
-
-Provide a diagnostics page:
-
-```text
-Accessibility      ✓
-Usage Access       ✓
-Default Launcher   ✓
-Battery status     ⚠
-Focus Service      ✓
-```
-
-If battery restrictions may interfere, explain the required user action.
-
-Do not claim 100% enforcement.
-
-Test on physical devices when possible.
-
-Prioritize testing on:
-
-* Samsung
-* Xiaomi
-* OPPO
-* OnePlus
-* Pixel/reference Android
-
----
-
-# 25. EMERGENCY / ESSENTIAL ACCESS
-
-Never block:
-
-* Emergency calling
-* Essential phone functionality
-
-Always preserve the ability to recover the device.
-
-Always Available applications should remain accessible.
-
-The application should never create a situation where the user cannot access essential communication or system recovery functionality.
-
----
-
-# 26. PRIVACY
-
-The MVP should be local-first.
-
-Do NOT implement:
-
-* User accounts
-* Cloud analytics
-* Advertising
-* Tracking
-* Social profiles
-* Remote monitoring
-
-Usage data should remain on the device.
-
-Clearly document:
-
-```text
-What is collected
-Why it is collected
-Where it is stored
-How it can be deleted
+                 Is App Managed / Blocked in Focus?
+                      ├── NO → AppLaunchDecision.Allow → Launch Intent
+                      └── YES → AppLaunchDecision.Block / ShowFriction
+                                   ↓
+                             Show BlockedAppDialog / ExitFrictionDialog
 ```
 
 ---
 
-# 27. UI DESIGN
+# 10. DAILY APP USAGE LIMITS & TIME LIMIT EXPIRY ENGINE
 
-Design language:
+To prevent endless scrolling during non-focus hours, NumbPhone includes a unified daily usage limit engine:
 
-* Minimal
-* Calm
-* Typography-focused
-* Low visual noise
-* Dark/light theme
-* High readability
-* Fast
-* Accessible
-
-Avoid:
-
-* Gamification overload
-* Excessive gradients
-* Large illustrations
-* Unnecessary animations
-* Notification-like red warning screens
-
-Use subtle animation only where useful, especially countdowns and state transitions.
+1. **Daily Limit Configuration**:
+   - Configurable per-app limit in minutes via `SetTimeLimitDialog` (e.g. 15m, 30m, 45m, 1h, 2h).
+   - Stored in Room database table `app_time_limits`.
+2. **Real-Time Foreground Tracking**:
+   - `UsageStatsRepository` calculates daily foreground minutes against the calendar date (ISO-8601).
+   - When foreground time reaches or exceeds `dailyLimitMinutes`, the app is marked as expired.
+3. **10-Second Countdown Expiry Warning (`TimeLimitExpiredDialog`)**:
+   - When an expired app is launched or running, the user is presented with a 10-second countdown alert.
+   - Shows remaining seconds, total time spent today, and reflection prompt.
+4. **Automatic Close**:
+   - If the countdown reaches 0 without an extension, `MinimalAccessibilityService` executes `performGlobalAction(GLOBAL_ACTION_HOME)`, smoothly closing the app and returning the user to NumbPhone.
+5. **Lock Until Tomorrow**:
+   - The app remains locked until midnight (00:00).
+6. **Deliberate Emergency Extensions**:
+   - In case of genuine need, users can grant a +5 minute or +15 minute extension.
+   - Extensions record an exit reason and update `emergencyExtensionMinutes` in the database.
 
 ---
 
-# 28. HOME SCREEN INFORMATION
+# 11. FOCUS SESSIONS, PRESETS & AUTOMATED SCHEDULING
 
-The home screen can show:
+### Focus Modes
+* **LIGHT**: Managed apps restricted; low exit delay (5s).
+* **STRICT**: Managed apps blocked; adaptive exit friction (5s → 30s → 2m); distracting apps hidden from launcher.
+* **DEEP FOCUS**: Maximum friction (up to 10m delay); status bar hidden; Grayscale mode engaged; DND silence enabled; no rule modifications allowed during session.
 
-```text
-Current time
-Date
-Focus state
-Remaining focus time
-Allowed apps
-```
+### Focus Presets (`FocusPresetEntity`)
+Quick-start presets available on the Focus Session screen:
+- **Quick Sprint**: 25 minutes, Light Mode (Pomodoro)
+- **Deep Work**: 50 minutes, Strict Mode
+- **Exam Preparation**: 120 minutes, Deep Focus Mode
 
-Optional:
-
-```text
-Today's blocked attempts
-```
-
-Do not overload the home screen with statistics.
-
-The launcher should feel like a tool, not an analytics dashboard.
+### Automated Recurring Focus Schedules (`FocusScheduler`)
+Using `AlarmManager.setExactAndAllowWhileIdle()` and `FocusScheduleReceiver`:
+- Users can schedule recurring focus blocks (e.g., Mon–Fri from 09:00 to 17:00).
+- Automatically transitions into active focus mode and applies configured mode/presets.
+- Automatically tears down the session when the duration elapses.
+- Recovers seamlessly across device reboots (`BOOT_COMPLETED`, `TIME_SET`, `TIMEZONE_CHANGED`).
 
 ---
 
-# 29. ANALYTICS DASHBOARD
+# 12. ADAPTIVE EXIT FRICTION & INTENT REFLECTION
 
-Implement basic analytics after the core blocking system works.
-
-Display:
+NumbPhone prevents impulsive early cancellation of focus sessions:
 
 ```text
-Today's screen time
-Weekly screen time
-Blocked attempts
-Focus sessions
-Completed sessions
-Focus completion rate
+User taps "End Session" or attempts early exit
+                 ↓
+    ExitFrictionEngine calculates required delay
+                 ↓
+     1st attempt  →  5 seconds
+     2nd attempt  →  30 seconds
+     3rd attempt  →  2 minutes
+     4th+ attempt →  10 minutes
+                 ↓
+       Show ExitFrictionDialog
+                 ↓
+  Displays Focus Goal ("Prepare for Exam")
+  Displays Time Remaining in Session
+  Live countdown timer (Cannot be clicked until 0)
+                 ↓
+  [ Continue Focusing ]   or   [ Confirm Exit Anyway (after countdown) ]
 ```
 
-Later support behavioral insights such as:
+### "Why Are You Opening This?" (`IntentReflectionDialog`)
+When a user attempts to launch a blocked app or request an emergency limit extension, an intent reflection dialog asks:
+* *Important / Urgent*
+* *Just checking*
+* *I'm bored*
+* *Someone sent me something*
+* *Other*
 
-```text
-Most bypass attempts:
-Monday
-2–4 PM
-
-Most attempted app:
-YouTube
-```
-
-Do NOT implement ML-based behavioral prediction in MVP.
-
-Keep the architecture ready for future analytics.
+Responses are stored locally in `blocked_attempts` for behavioral wellbeing analysis.
 
 ---
 
-# 30. FUTURE FEATURES — DO NOT BUILD IN MVP
+# 13. BYPASS PROTECTION & ACCESSIBILITY BACKSTOP
 
-Keep these in architecture/documentation but DO NOT implement them until the MVP is stable:
+While the launcher controls home screen launches, secondary avenues exist:
+* Notification tap
+* Deep links
+* Recent apps screen
+* External Intents from other applications
 
-### Root/Magisk enforcement
+### Accessibility Service Implementation (`MinimalAccessibilityService`)
+A lightweight, privacy-preserving Accessibility Service acts as a backstop:
+- Listens strictly to `typeWindowStateChanged` events.
+- Evaluates the foreground package against active focus sessions and daily time limits.
+- If an unpermitted app is detected, it immediately launches `MainActivity` with `Intent.FLAG_ACTIVITY_NEW_TASK` and triggers `performGlobalAction(GLOBAL_ACTION_HOME)`.
 
-Optional stronger enforcement for rooted devices.
+### Banking & Security Compliance: Zero Content Scraping
+To prevent conflict with banking, UPI, and financial apps that block accessibility tools:
+- `canRetrieveWindowContent` is strictly set to `false` in `res/xml/accessibility_service_config.xml`.
+- Flags like `flagRetrieveInteractiveWindows` and `typeWindowsChanged` are excluded.
+- The service **cannot** read screen contents, view text, or capture keystrokes. It only reads the package name identifier.
 
-### Contextual notification digest
-
-Show only important notifications during focus.
-
-### Advanced behavioral analytics
-
-Correlate:
-
-```text
-time of day
-day of week
-application
-bypass reason
-focus success
-```
-
-### Calendar integration
-
-Automatically schedule study sessions.
-
-### Exam Mode
-
-Student-focused preset:
-
-```text
-Exam Mode
-    ↓
-Predefined distraction blocklist
-    ↓
-Calendar-linked sessions
-    ↓
-Focus streaks
-```
-
-### Cloud synchronization
-
-Only consider after privacy architecture is established.
-
----
-
-# 31. SECURITY / SAFETY PRINCIPLES
-
-Do not implement malicious persistence.
-
-Do not hide the application from Android settings.
-
-Do not prevent the user from uninstalling the application through exploitative techniques.
-
-Do not attempt to bypass Android security mechanisms.
-
-Do not exploit AccessibilityService beyond its legitimate documented purpose.
-
-The goal is behavioral friction, not device imprisonment.
-
----
-
-# 32. DEVELOPMENT MILESTONES
-
-Build the application in this exact order.
-
-## MILESTONE 0 — PROJECT FOUNDATION
-
-Create:
-
-* Gradle project
-* Modules
-* Version catalog
-* Hilt
-* Compose
-* Room
-* Basic navigation
-* Documentation
-
-Before moving forward:
-
-```text
-BUILD SUCCESSFUL
+```xml
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault"
+    android:canRetrieveWindowContent="false"
+    android:notificationTimeout="100"
+    android:description="@string/accessibility_service_description"
+    android:summary="@string/accessibility_service_summary" />
 ```
 
 ---
 
-## MILESTONE 1 — LAUNCHER SHELL
+# 14. NOTIFICATION DIGEST & NOTIFICATION LISTENER
 
-Implement:
-
-* HOME activity
-* Minimal Compose UI
-* Static sample apps
-* Default launcher setup
-* App launching
-
-Exit criteria:
-
-```text
-Application can become default launcher.
-Home button returns to Minimal Phone.
-Visible apps launch correctly.
-```
-
-Do NOT implement blocking yet.
+To eliminate notification anxiety during study or deep work:
+- `MinimalNotificationListenerService` extends `NotificationListenerService`.
+- Active during focus sessions.
+- Suppresses incoming non-essential notification alerts and heads-up banners.
+- Bundles notifications into `digest_notifications` Room table.
+- Essential calls and priority messages bypass the digest.
+- Users can view the summarized Notification Digest via the Home Screen Quick Control Center.
 
 ---
 
-## MILESTONE 2 — REAL APP DISCOVERY
+# 15. SYSTEM-LEVEL HARDWARE GRAYSCALE MODE
 
-Implement:
-
-* LauncherApps
-* PackageManager integration
-* Installed app scanning
-* Classification
-* Dynamic app list
-* Install/uninstall callbacks
-
-Exit criteria:
-
-```text
-Install app
-    ↓
-Minimal Phone detects it
-
-Uninstall app
-    ↓
-Minimal Phone removes it
-```
+Color is the primary driver of smartphone dopamine loops. NumbPhone provides automated display desaturation:
+- Managed by `GrayscaleHelper`.
+- Toggles `Settings.Secure.accessibility_display_daltonizer_enabled` and `accessibility_display_daltonizer` (`DALTONIZER_MONOCHROMACY`).
+- Automatically turns the entire phone screen monochrome upon starting a Deep Focus session.
+- Restores full color when the session finishes.
+- Requires one-time ADB permission grant:
+  ```bash
+  adb shell pm grant com.minimalphone android.permission.WRITE_SECURE_SETTINGS
+  ```
+- If permission is not granted via ADB, the UI provides clear step-by-step guidance without crashing.
 
 ---
 
-## MILESTONE 3 — APP MANAGEMENT
+# 16. EMERGENCY ACCESS & QUICK CONTACTS SPEED DIAL
 
-Implement:
+Safety is paramount. NumbPhone ensures emergency access is never compromised:
 
-* Always Available apps
-* Managed apps
-* Whitelist UI
-* App rules
-* Room persistence
+### System Emergency Whitelist (`EmergencyAccessManager`)
+The following package patterns are permanently exempted from all blocking, focus sessions, and time limits:
+* `com.android.emergency` (AOSP Emergency SOS)
+* `com.android.phone`, `com.android.dialer`
+* `com.samsung.android.dialer`, `com.sec.android.emergencylauncher`
+* `com.google.android.dialer`, `com.oneplus.dialer`, `com.motorola.phone`
+* System dialer, SMS, contacts, and alarm intents
 
-Exit criteria:
-
-```text
-User can change managed/allowed state.
-Changes persist after restart.
-```
-
----
-
-## MILESTONE 4 — USAGE TRACKING
-
-Implement:
-
-* UsageStatsManager
-* Daily usage
-* App usage repository
-* Basic analytics
-
-Exit criteria:
-
-```text
-Actual device usage appears correctly.
-```
+### Pinned Quick Contacts (`QuickContactEntity`)
+Users can pin family members, doctors, or emergency contacts:
+- Displayed as a horizontal speed-dial row right under the Home screen clock.
+- One-tap initiates a direct call via `Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number"))`.
+- Accessible even during active focus sessions.
 
 ---
 
-## MILESTONE 5 — BLOCKING
+# 17. ROOM DATABASE ARCHITECTURE & SCHEMA
 
-This is the highest-risk milestone.
+Database: `MinimalPhoneDatabase` (SQLite via Room).
 
-Implement:
+### Entity Roster:
+1. **`InstalledAppEntity`**: Package name, activity, label, category, system app flag, essential flag, favorite on home flag, classification source.
+2. **`AppRuleEntity`**: Package rules, category overrides, always available state, blocked in focus state, custom label.
+3. **`FocusSessionEntity`**: Session ID, start/end timestamps, duration, goal title/category, mode (Light/Strict/Deep), status, bypass attempt count, friction seconds completed.
+4. **`BlockedAttemptEntity`**: ID, package name, label, timestamp, session ID, route (Launcher, Recents, Notification), user intent reflection reason.
+5. **`ExitAttemptEntity`**: ID, session ID, attempt number, required/completed friction seconds, timestamp, success flag, exit reason.
+6. **`FocusGoalEntity`**: ID, title, category, custom flag, usage count, last used timestamp.
+7. **`EssentialAppEntity`**: User-designated essential packages that bypass all restrictions.
+8. **`DailyAppUsageEntity`**: Date (ISO-8601), package name, foreground minutes, launch count, blocked attempts.
+9. **`FocusPresetEntity`**: Quick-start presets (Sprint, Deep Work, Exam Prep).
+10. **`FocusScheduleEntity`**: Recurring alarms (preset ID, days of week, start hour/minute, duration, enabled flag).
+11. **`DigestNotificationEntity`**: Intercepted notifications (package, label, title, text, timestamp, read status).
+12. **`QuickContactEntity`**: Speed-dial contacts (name, phone number, pinned flag).
+13. **`AppTimeLimitEntity`**: Daily limit rules (package name, daily limit minutes, enabled flag, emergency extension minutes, last extension timestamp).
 
-* AccessibilityService
-* Foreground detection
-* Managed-app blocking
-* Redirect behavior
-* Physical-device testing
-
-Exit criteria:
-
-```text
-Focus Mode ON
-
-Open blocked application
-        ↓
-Application is blocked
-        ↓
-Minimal Phone returns to foreground
-```
-
-Test multiple applications.
+All database queries return reactive `Flow` objects to ensure instant UI reactivity.
 
 ---
 
-## MILESTONE 6 — FOCUS SESSIONS
+# 18. SETTINGS HUB & COMMUNITY FEEDBACK
 
-Implement:
-
-* Start/end times
-* Manual focus mode
-* Focus modes
-* Focus goal
-* Session state
-* Session persistence
-
-Exit criteria:
+The Settings screen is organized into dedicated hubs:
 
 ```text
-Start focus session
-       ↓
-Managed apps blocked
-       ↓
-Session ends
-       ↓
-Apps become available
+SETTINGS
+│
+├── 🎨 APPEARANCE & THEMES
+│   └── Minimalist color palettes (Pure OLED Black, E-Ink Paper, Warm Amber)
+│
+├── 🧘 FOCUS & DETOX
+│   └── Default session durations, adaptive exit friction toggle, dumb phone mode
+│
+├── ⏳ APP LIMITS & WHITELIST
+│   └── Daily app budgets, set time limits, essential access management
+│
+├── 🛡️ SYSTEM & DIAGNOSTICS
+│   └── DND access, accessibility backstop, "NumbPhone Health" diagnostics, setup wizard
+│
+└── 📦 DATA & ABOUT
+    ├── Local JSON backup & clipboard export / restore
+    ├── Community feedback link (Google Form)
+    └── Local-First Privacy Charter & v1.0.0 architecture specs
 ```
+
+### Community Feedback Integration
+A "Suggestions & Feedback" button is prominently placed in settings, opening the official Google Form:
+- URL: `https://forms.gle/T3xsTRHTx2uDaoVP6`
+- Opens via standard `ACTION_VIEW` browser intent.
 
 ---
 
-## MILESTONE 7 — EXIT FRICTION
+# 19. LOCAL DATA PORTABILITY (BACKUP & RESTORE)
 
-Implement:
-
-* Countdown
-* Focus goal reminder
-* Adaptive friction
-* Exit attempt recording
-* "Why are you opening this?"
-* Strict/Deep modes
-
-Exit criteria:
-
-```text
-User cannot immediately disable a focus session
-through the normal UI.
-```
-
-There must always be a recovery path.
+In alignment with local-first privacy:
+- **`ExportBackupJsonUseCase`**: Serializes all app rules, focus session history, pinned contacts, time limits, and DataStore preferences into a structured JSON payload copied directly to the clipboard.
+- **`ImportBackupJsonUseCase`**: Validates JSON schema integrity and restores entities into Room and DataStore in a single atomic transaction.
+- Zero server communication or cloud accounts required.
 
 ---
 
-## MILESTONE 8 — BYPASS PROTECTION
+# 20. MINIMALIST DESIGN SYSTEM & THEMING
 
-Test:
+NumbPhone strictly avoids colorful gamification, flashy gradients, and noisy animations.
 
-```text
-Launcher tap
-Notification tap
-Deep link
-Recent Apps
-External intent
-```
+### Supported Themes (`AppTheme`):
+1. **`PURE_BLACK` (OLED)**: Background `#000000`, Text `#FFFFFF`, Surface `#18181B`. Maximizes battery savings on OLED screens.
+2. **`E_INK_PAPER`**: Background `#F5F5F0`, Text `#1A1A1A`, Surface `#EBEBE4`. Simulates physical paper / e-reader devices.
+3. **`WARM_AMBER`**: Background `#12100E`, Text `#E6A15C`, Surface `#1F1B17`. Late-night low blue-light reading mode.
 
-Use Accessibility as the backstop.
-
-Exit criteria:
-
-```text
-Managed applications cannot easily bypass
-focus restrictions through common routes.
-```
+### Typography
+- Primary: Modern high-readability sans-serif (Inter / System Clean).
+- Numerical displays: Monospaced high-contrast numerals for clocks and countdowns.
 
 ---
 
-## MILESTONE 9 — BOOT + OEM RESILIENCE
+# 21. PROGUARD & R8 PRODUCTION RELEASE HARDENING
 
-Implement/test:
-
-* Boot receiver
-* Focus restoration
-* Service recovery
-* Battery guidance
-* Diagnostics
-
-Test physical devices.
+Production release builds have full R8 optimization enabled in `app/build.gradle.kts`:
+```kotlin
+buildTypes {
+    release {
+        isMinifyEnabled = true
+        isShrinkResources = true
+        proguardFiles(
+            getDefaultProguardFile("proguard-android-optimize.txt"),
+            "proguard-rules.pro"
+        )
+    }
+}
+```
+`app/proguard-rules.pro` contains explicit keep rules for:
+- Jetpack Compose & Material 3 internals
+- Room Database Entities, DAOs, and Type Converters
+- Dagger Hilt generated code and bindings
+- DataStore Preferences serialization
+- Kotlin Coroutines and reflection models
 
 ---
 
-## MILESTONE 10 — POLISH
+# 22. COMPLETE DEVELOPMENT MILESTONES & ROADMAP
 
-Implement:
+The application has been executed in disciplined, verified milestones:
 
-* Onboarding
-* Settings
-* Analytics
-* Error handling
-* Empty states
-* Accessibility
-* Dark/light theme
-* Performance improvements
-* Crash handling
+### Core Foundation & MVP:
+* **M0 — Project Foundation**: Multi-module Gradle architecture, Hilt, Room, Compose setup.
+* **M1 — Launcher Shell**: Android HOME activity registration, minimal UI, default launcher setup.
+* **M2 — Real App Discovery**: `LauncherApps` API, `PackageManager` callbacks, dynamic scanning.
+* **M3 — App Management**: Categorization, Room persistence, whitelist management.
+* **M4 — Usage Tracking**: `UsageStatsManager` integration, screen time calculation.
+* **M5 — Blocking Engine**: Accessibility Service backstop, foreground interception, redirect to launcher.
+* **M6 — Focus Sessions**: Active session state machine, timers, goal specification, Room history.
+* **M7 — Exit Friction**: Deliberate delay countdowns, adaptive progression (5s, 30s, 2m, 10m), reflection prompts.
+* **M8 — Bypass Protection**: Multi-route coverage (Recents, notifications, deep links, external intents).
+* **M9 — Boot & OEM Resilience**: `BOOT_COMPLETED` receivers, service diagnostics, battery guidance.
+* **M10 — Polish & Onboarding**: 4-step wizard, DataStore preferences, settings navigation.
 
----
-
-# 33. TESTING REQUIREMENTS
-
-Write tests for:
-
-### Unit tests
-
-* App classification
-* Focus state
-* Blocking decisions
-* Exit friction
-* Adaptive friction
-* Session calculations
-
-### Database tests
-
-* Insert/update/delete
-* Session persistence
-* App rule persistence
-
-### UI tests
-
-* Launcher
-* App list
-* Focus creation
-* Exit friction
-* Settings
-
-### Integration tests
-
-```text
-App discovery → DB → UI
-
-Focus session → blocking
-
-Exit attempt → friction → session
-
-Boot → state restoration
-```
+### Production Hardening & Phase 2 Advanced Features:
+* **M11 — Release Optimization & Theming**: Local JSON backup/restore, custom themes (Pure Black, E-Ink, Warm Amber), search filter, R8/ProGuard shrinking.
+* **M12 — Immersive Full-Screen Launcher**: Status bar hiding via `WindowInsetsControllerCompat`, 6 essential default apps auto-pinning, "+ Add app" quick button.
+* **M13 — Banking & Security Compatibility**: Set `canRetrieveWindowContent="false"`, eliminated screen inspection, guaranteed zero conflict with banking/UPI apps.
+* **M14 — Daily App Usage Limits Engine**: Per-app daily minutes budget, 10-second countdown expiry pop-up, auto-close via AccessibilityService, lock until tomorrow, emergency +5m/+15m extensions.
+* **M15 — Automated Focus Scheduling**: `FocusScheduler` with exact alarms, recurring day-of-week schedules, focus presets.
+* **M16 — Notification Digest Interception**: `MinimalNotificationListenerService` quiet notification buffering during focus, quick control center digest UI.
+* **M17 — Hardware / System Grayscale Mode**: `GrayscaleHelper` with `WRITE_SECURE_SETTINGS` display desaturation during focus.
+* **M18 — Quick Contacts Speed Dial**: Emergency contact pinning row on home screen with one-tap dialing.
+* **M19 — Home Apps Filtering**: `AppListFilter.HOME` chip in app management to manage pinned apps effortlessly.
+* **M20 — Community Feedback & Branding**: Official Google Form suggestions link, NumbPhone logo assets, themed monochrome icons, 512×512 Google Play Store package.
 
 ---
 
-# 34. DEBUG / DIAGNOSTICS SCREEN
+# 23. TESTING & VERIFICATION REQUIREMENTS
 
-Create an internal debug screen during development.
+Maintain high test coverage across all layers:
 
-Show:
+### Unit Tests:
+* App classification logic (`AppTaxonomyClassifierTest`)
+* Central launch decisions (`LaunchEngineTest`)
+* Focus session state & expiry calculations (`FocusEngineTest`)
+* Exit friction duration calculations (`ExitFrictionEngineTest`)
+* Bypass route interception decisions (`BypassEngineTest`)
+* DataStore settings use cases (`SettingsUseCasesTest`)
+* JSON backup export and import validation (`BackupUseCasesTest`)
+* ViewModel state machines (`HomeViewModelTest`, `AppsManagementViewModelTest`, `FocusSessionViewModelTest`, `ScreenTimeViewModelTest`)
 
-```text
-Default Launcher: YES/NO
-Accessibility: YES/NO
-Usage Access: YES/NO
-Battery unrestricted: YES/NO
+### Database Tests:
+* Room DAO entity inserts, queries, cascading updates, and schema migrations.
 
-Focus Mode: ON/OFF
-Session End: timestamp
-
-Foreground App:
-package.name
-
-Last Accessibility Event:
-event type
-
-Last Block:
-package.name
-
-Bypass Attempts:
-count
-```
-
-This screen can be hidden or disabled in release builds.
+### Physical Device Verification:
+* Test default launcher behavior, home button responsiveness, and recents button interception.
+* Test banking app launch compatibility with active Accessibility Service.
+* Test OEM battery management behavior on Samsung (OneUI), Xiaomi (MIUI/HyperOS), OnePlus (OxygenOS), and Google Pixel.
 
 ---
 
-# 35. LOGGING
-
-Use structured logging.
-
-Create meaningful tags such as:
-
-```text
-Launcher
-AppDiscovery
-FocusEngine
-BlockingService
-Accessibility
-UsageStats
-Database
-BootRecovery
-```
-
-Never log:
-
-* passwords
-* sensitive user content
-* notification contents unnecessarily
-* private messages
-
-Remove verbose development logging from release builds.
-
----
-
-# 36. ERROR HANDLING
-
-Never silently fail.
-
-If Accessibility permission is missing:
-
-```text
-Accessibility is required for bypass protection.
-
-[Open Settings]
-```
-
-If Usage Access is missing:
-
-```text
-Usage Access is required for screen-time statistics.
-
-[Open Settings]
-```
-
-If the app is not the default launcher:
-
-```text
-Minimal Phone is not your default launcher.
-
-[Set as Default]
-```
-
----
-
-# 37. PERFORMANCE
-
-The launcher must start quickly.
-
-Avoid:
-
-* Heavy database queries during startup
-* Blocking the main thread
-* Continuous polling
-* Excessive accessibility processing
-* Unnecessary recompositions
-* Memory-heavy application icons
-
-Use:
-
-* Coroutines
-* Background dispatchers
-* Caching
-* Lazy lists
-* StateFlow
-* Efficient icon loading
-
----
-
-# 38. IMPORTANT IMPLEMENTATION RULE
-
-Do NOT try to build the entire application in one pass.
-
-Work milestone-by-milestone.
-
-After each milestone:
-
-1. Build the project.
-2. Run tests.
-3. Inspect compiler errors.
-4. Fix issues.
-5. Run the application.
-6. Verify functionality.
-7. Update documentation.
-8. Only then proceed.
-
-If an Android API behaves differently than expected:
-
-STOP.
-
-Investigate the correct Android-supported implementation before inventing a workaround.
-
-Do not create fake APIs or placeholder implementations for core functionality.
-
----
-
-# 39. SOURCE CODE QUALITY
-
-Follow:
-
-* SOLID principles
-* Clean Architecture
-* Dependency inversion
-* Small focused classes
-* Meaningful names
-* Kotlin idioms
-* Immutable UI state where practical
-* Repository pattern
-* Use-case pattern
-* Dependency injection
-
-Avoid:
-
-```text
-God classes
-Huge Activities
-Huge Composables
-Global mutable state
-Hardcoded package lists
-Business logic in UI
-Database calls in UI
-```
-
----
-
-# 40. DOCUMENTATION
-
-Maintain:
-
-```text
-docs/prd.md
-docs/architecture.md
-docs/permissions.md
-docs/testing.md
-docs/risks.md
-```
-
-Document important Android limitations.
-
-Especially document:
-
-* Accessibility limitations
-* Launcher behavior
-* OEM battery restrictions
-* Android version differences
-* Stock Android enforcement limitations
-* Permission requirements
-
----
-
-# 41. PRODUCT SUCCESS CRITERIA
-
-The MVP is successful when:
-
-### Launcher
-
-```text
-User can set Minimal Phone as default launcher.
-```
-
-### Application discovery
-
-```text
-Installed apps appear dynamically.
-```
-
-### Classification
-
-```text
-Essential apps remain available.
-Managed apps can be controlled.
-```
-
-### Blocking
-
-```text
-Managed apps are blocked during Focus Mode.
-```
-
-### Focus
-
-```text
-User can create and complete a focus session.
-```
-
-### Exit friction
-
-```text
-Leaving a session requires deliberate action.
-```
-
-### Bypass protection
-
-```text
-Common alternate launch routes are detected and handled.
-```
-
-### Persistence
-
-```text
-Rules survive application restart and reboot where Android permits.
-```
-
-### Performance
-
-```text
-Launcher remains responsive.
-```
-
----
-
-# 42. FINAL PRODUCT PHILOSOPHY
-
-Minimal Phone should feel like:
-
-```text
-Less phone.
-More intention.
-```
-
-The experience should communicate:
-
-> "Your phone is a tool. You decide what deserves your attention."
-
-Not:
-
-> "The application controls your phone."
-
-The product should reduce impulsive behavior through:
-
-```text
-Minimal UI
-      +
-Intentional app access
-      +
-Focus sessions
-      +
-Reliable blocking
-      +
-Bypass resistance
-      +
-Exit friction
-      +
-Behavioral feedback
-```
-
----
-
-# 43. FIRST ACTION
-
-Before writing substantial code:
-
-1. Inspect the current project directory.
-2. Determine whether an Android project already exists.
-3. Inspect installed Android Studio/Gradle/JDK/SDK versions.
-4. Determine the available Android SDK.
-5. Create a short implementation plan.
-6. Create/update the project documentation.
-7. Then begin MILESTONE 0.
-
-Do NOT ask me to manually create every file.
-
-You are expected to create the project structure and implementation yourself.
-
-However, do not blindly proceed through all milestones.
-
-Complete one milestone, verify it, and then continue.
-
-At every major milestone, report:
-
-```text
-MILESTONE:
-STATUS:
-IMPLEMENTED:
-TESTED:
-KNOWN ISSUES:
-NEXT STEP:
-```
-
-Start now with **MILESTONE 0 — PROJECT FOUNDATION**.
+# 24. SUMMARY COMMAND & EXECUTION DIRECTIVE
+
+When instructing or continuing development on **NumbPhone**:
+1. Treat this document as the single source of truth for features, architecture, and design rules.
+2. Maintain Clean Architecture separation across all modules.
+3. Preserve all security constraints (notably `canRetrieveWindowContent="false"`).
+4. Keep the design calm, minimalist, and typography-centered.
+5. Ensure all data remains 100% on-device and local-first.
