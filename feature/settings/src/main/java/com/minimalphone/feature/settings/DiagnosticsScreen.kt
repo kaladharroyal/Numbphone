@@ -181,6 +181,17 @@ fun DiagnosticsScreen(
                     }
                 }
 
+                // Diagnostic Check 8: Pause Overlay Ready (M22)
+                item {
+                    DiagnosticItemCard(
+                        title = "Pause Overlay Ready",
+                        description = "Displays mindful pause overlays on notifications, deep links, and app switches via Accessibility.",
+                        isPassed = state.isPauseOverlayReady,
+                        actionLabel = if (state.isPauseOverlayReady) "READY" else "SERVICE REQUIRED",
+                        onActionClick = { viewModel.openAccessibilitySettings() }
+                    )
+                }
+
                 // OEM Specific Guidance Banner
                 state.oemGuidance?.let { guidance ->
                     item {

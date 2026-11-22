@@ -97,6 +97,7 @@ fun SettingsScreen(
     onNavigateToDiagnostics: () -> Unit,
     onNavigateToOnboarding: () -> Unit,
     onNavigateToBypassProtection: () -> Unit = {},
+    onNavigateToMindfulPause: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
@@ -231,7 +232,8 @@ fun SettingsScreen(
                             onToggleAdaptiveFriction = { viewModel.onToggleAdaptiveFriction(it) },
                             onSelectDefaultDuration = { viewModel.onSelectDefaultDuration(it) },
                             onToggleDumbMode = { viewModel.onToggleDumbMode(it) },
-                            onToggleAutoGrayscale = { viewModel.onToggleAutoGrayscaleInFocus(it) }
+                            onToggleAutoGrayscale = { viewModel.onToggleAutoGrayscaleInFocus(it) },
+                            onNavigateToMindfulPause = onNavigateToMindfulPause
                         )
                     }
                     SettingsSection.APP_LIMITS -> {
@@ -522,12 +524,25 @@ private fun FocusDetoxSettingsView(
     onToggleAdaptiveFriction: (Boolean) -> Unit,
     onSelectDefaultDuration: (Int) -> Unit,
     onToggleDumbMode: (Boolean) -> Unit,
-    onToggleAutoGrayscale: (Boolean) -> Unit
+    onToggleAutoGrayscale: (Boolean) -> Unit,
+    onNavigateToMindfulPause: () -> Unit
 ) {
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(bottom = 32.dp)
     ) {
+        item {
+            SectionHeader(title = "MINDFUL INTERVENTIONS")
+        }
+
+        item {
+            NavigationActionCard(
+                title = "Mindful Pause",
+                subtitle = "Breathing circle, intentions, and progressive delays before opening managed apps",
+                onClick = onNavigateToMindfulPause
+            )
+        }
+
         item {
             SectionHeader(title = "FRICTION & DURATION")
         }

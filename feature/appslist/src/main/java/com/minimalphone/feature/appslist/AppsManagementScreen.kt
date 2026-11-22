@@ -45,6 +45,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.outlined.HourglassBottom
+import androidx.compose.material.icons.outlined.HourglassEmpty
+import com.minimalphone.core.model.PauseConfig
+import com.minimalphone.core.ui.components.PauseSettingsDialog
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -66,6 +69,7 @@ fun AppsManagementScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedAppForLimit by remember { mutableStateOf<InstalledApp?>(null) }
+    var selectedAppForPause by remember { mutableStateOf<InstalledApp?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
     var isAccessibilityEnabled by remember {
         mutableStateOf(
@@ -298,10 +302,12 @@ fun AppsManagementScreen(
                         AppManagementRow(
                             app = app,
                             timeLimit = uiState.limitsMap[app.packageName],
+                            pauseConfig = uiState.pauseConfigsMap[app.packageName],
                             todayUsedMinutes = uiState.usageMinutesMap[app.packageName] ?: 0L,
                             onToggleCategory = { viewModel.toggleAppCategory(app) },
                             onToggleFavorite = { viewModel.toggleFavoriteOnHome(app) },
-                            onConfigureLimit = { selectedAppForLimit = app }
+                            onConfigureLimit = { selectedAppForLimit = app },
+                            onConfigurePause = { selectedAppForPause = app }
                         )
                     }
 
@@ -366,6 +372,21 @@ fun AppsManagementScreen(
                 }
             )
         }
+
+        // Mindful Pause Configuration Dialog (M22)
+        if (selectedAppForPause != null) {
+            val targetApp = selectedAppForPause!!
+            val currentConfig = uiState.pauseConfigsMap[targetApp.packageName]
+            PauseSettingsDialog(
+                appLabel = targetApp.label,
+                packageName = targetApp.packageName,
+                currentConfig = currentConfig,
+                onDismiss = { selectedAppForPause = null },
+                onSave = { config ->
+                    viewModel.saveAppPauseConfig(config)
+                }
+            )
+        }
     }
 }
 
@@ -373,10 +394,12 @@ fun AppsManagementScreen(
 fun AppManagementRow(
     app: InstalledApp,
     timeLimit: AppTimeLimit? = null,
+    pauseConfig: PauseConfig? = null,
     todayUsedMinutes: Long = 0L,
     onToggleCategory: () -> Unit,
     onToggleFavorite: () -> Unit,
     onConfigureLimit: () -> Unit,
+    onConfigurePause: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isEssential = app.category == AppCategory.ESSENTIAL
@@ -420,6 +443,15 @@ fun AppManagementRow(
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Mindful Pause Config Button
+            IconButton(onClick = onConfigurePause) {
+                Icon(
+                    imageVector = Icons.Outlined.HourglassEmpty,
+                    contentDescription = "Configure mindful pause",
+                    tint = if (pauseConfig != null && pauseConfig.enabled) Color(0xFF32D74B) else MutedText
+                )
+            }
+
             // Daily Time Limit Button
             IconButton(onClick = onConfigureLimit) {
                 Icon(

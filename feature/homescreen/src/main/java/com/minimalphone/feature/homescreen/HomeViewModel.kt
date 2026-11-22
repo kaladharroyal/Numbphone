@@ -12,12 +12,16 @@ import com.minimalphone.core.data.repository.SettingsRepository
 import com.minimalphone.core.domain.dumbmode.LauncherPolicy
 import com.minimalphone.core.domain.friction.RecordIntentReflectionUseCase
 import com.minimalphone.core.domain.launch.LaunchAppUseCase
+import com.minimalphone.core.domain.pause.PauseEngine
 import com.minimalphone.core.domain.timelimit.TimeLimitExpiryNotifier
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.AppLaunchDecision
 import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSession
 import com.minimalphone.core.model.InstalledApp
+import com.minimalphone.core.model.PauseConfig
+import com.minimalphone.core.model.PauseEventKind
+import com.minimalphone.core.model.PauseOutcome
 import com.minimalphone.core.model.QuickContact
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +54,15 @@ data class ReflectionDialogState(
     val focusSessionId: String? = null
 )
 
+data class PauseScreenState(
+    val isShowing: Boolean = false,
+    val packageName: String = "",
+    val appLabel: String = "",
+    val activityName: String = "",
+    val config: PauseConfig = PauseConfig(""),
+    val delaySeconds: Int = 5
+)
+
 data class HomeUiState(
     val visibleApps: List<InstalledApp> = emptyList(),
     val isFocusActive: Boolean = false,
@@ -61,7 +74,8 @@ data class HomeUiState(
     val isLoading: Boolean = true,
     val blockedDialog: BlockedDialogState = BlockedDialogState(),
     val timeLimitExpiredDialog: TimeLimitExpiredDialogState = TimeLimitExpiredDialogState(),
-    val reflectionDialog: ReflectionDialogState = ReflectionDialogState()
+    val reflectionDialog: ReflectionDialogState = ReflectionDialogState(),
+    val pauseScreen: PauseScreenState = PauseScreenState()
 )
 
 @HiltViewModel
@@ -76,7 +90,8 @@ class HomeViewModel @Inject constructor(
     private val contactRepository: ContactRepository,
     private val digestRepository: NotificationDigestRepository,
     private val appTimeLimitRepository: AppTimeLimitRepository,
-    private val timeLimitExpiryNotifier: TimeLimitExpiryNotifier
+    private val timeLimitExpiryNotifier: TimeLimitExpiryNotifier,
+    private val pauseEngine: PauseEngine? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -206,8 +221,54 @@ class HomeViewModel @Inject constructor(
                         )
                     )
                 }
+                is AppLaunchDecision.ShowPause -> {
+                    _uiState.value = _uiState.value.copy(
+                        pauseScreen = PauseScreenState(
+                            isShowing = true,
+                            packageName = decision.packageName,
+                            appLabel = app.label,
+                            activityName = decision.activityName,
+                            config = decision.config,
+                            delaySeconds = decision.delaySeconds
+                        )
+                    )
+                }
             }
         }
+    }
+
+    fun onPauseLeave(packageName: String, delaySeconds: Int) {
+        _uiState.value = _uiState.value.copy(pauseScreen = PauseScreenState(isShowing = false))
+        viewModelScope.launch {
+            pauseEngine?.recordOutcome(
+                packageName = packageName,
+                kind = PauseEventKind.LAUNCH,
+                outcome = PauseOutcome.LEFT,
+                secondsShown = delaySeconds
+            )
+        }
+    }
+
+    fun onPauseContinue(
+        packageName: String,
+        activityName: String,
+        config: PauseConfig,
+        delaySeconds: Int,
+        reflectionReason: String?,
+        onAllowLaunch: (String, String) -> Unit
+    ) {
+        _uiState.value = _uiState.value.copy(pauseScreen = PauseScreenState(isShowing = false))
+        pauseEngine?.grantSession(packageName, config.sessionMinutes)
+        viewModelScope.launch {
+            pauseEngine?.recordOutcome(
+                packageName = packageName,
+                kind = PauseEventKind.LAUNCH,
+                outcome = PauseOutcome.PROCEEDED,
+                reflectionReason = reflectionReason,
+                secondsShown = delaySeconds
+            )
+        }
+        onAllowLaunch(packageName, activityName)
     }
 
     fun onAddContact(name: String, phoneNumber: String) {

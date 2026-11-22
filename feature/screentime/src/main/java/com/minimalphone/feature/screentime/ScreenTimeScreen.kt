@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SelfImprovement
@@ -191,6 +192,45 @@ fun ScreenTimeScreen(
                             insights = uiState.insights,
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
                         )
+                    }
+
+                    // Mindful Pauses Insights (M22)
+                    if (uiState.insights.totalPausesShownToday > 0) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 20.dp, vertical = 4.dp)
+                                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(10.dp))
+                                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp))
+                                    .padding(14.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.HourglassEmpty,
+                                        contentDescription = null,
+                                        tint = Color(0xFF32D74B),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "Mindful Pauses",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = "Pauses: ${uiState.insights.totalPausesShownToday} · You walked away ${uiState.insights.pausesWalkedAwayToday} times (${uiState.insights.walkAwayRatePercentToday}%).",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MutedText
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // 3. Weekly Wellbeing Report Card (M19)

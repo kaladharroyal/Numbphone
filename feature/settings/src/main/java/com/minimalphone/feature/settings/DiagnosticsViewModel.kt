@@ -73,7 +73,8 @@ class DiagnosticsViewModel @Inject constructor(
                 oemGuidance = guidance,
                 isSettingsGuardReady = isGuardReady,
                 isUninstallLockActive = isUninstallActive,
-                unreviewedQuarantinedAppsCount = quarantinedCount
+                unreviewedQuarantinedAppsCount = quarantinedCount,
+                isPauseOverlayReady = isAccessibilityEnabled
             ).collect { data ->
                 _diagnosticsState.value = data
             }

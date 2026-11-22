@@ -59,6 +59,7 @@ import com.minimalphone.core.model.QuickContact
 import com.minimalphone.core.ui.components.BlockedAppDialog
 import com.minimalphone.core.ui.components.FocusStatusIndicator
 import com.minimalphone.core.ui.components.IntentReflectionDialog
+import com.minimalphone.core.ui.components.MindfulPauseScreen
 import com.minimalphone.core.ui.components.MinimalAppItemRow
 import com.minimalphone.core.ui.components.MinimalClockHeader
 import com.minimalphone.core.ui.components.TimeLimitExpiredDialog
@@ -354,6 +355,32 @@ fun HomeScreen(
                 onNavigateToFocus = onNavigateToFocus,
                 onNavigateToScreenTime = onNavigateToScreenTime,
                 onNavigateToSettings = onNavigateToSettings
+            )
+        }
+
+        // M22: Mindful Pause Full-Screen Overlay (Launcher Path)
+        if (uiState.pauseScreen.isShowing) {
+            val pauseState = uiState.pauseScreen
+            MindfulPauseScreen(
+                packageName = pauseState.packageName,
+                appLabel = pauseState.appLabel,
+                config = pauseState.config,
+                delaySeconds = pauseState.delaySeconds,
+                isReintervention = false,
+                onLeave = {
+                    viewModel.onPauseLeave(pauseState.packageName, pauseState.delaySeconds)
+                },
+                onContinue = { reflectionReason ->
+                    viewModel.onPauseContinue(
+                        packageName = pauseState.packageName,
+                        activityName = pauseState.activityName,
+                        config = pauseState.config,
+                        delaySeconds = pauseState.delaySeconds,
+                        reflectionReason = reflectionReason
+                    ) { pkg, _ ->
+                        AppLauncher.launchAppByPackage(context, pkg)
+                    }
+                }
             )
         }
     }

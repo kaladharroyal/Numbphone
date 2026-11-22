@@ -4,11 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.minimalphone.core.data.repository.AppRepository
 import com.minimalphone.core.data.repository.AppTimeLimitRepository
+import com.minimalphone.core.data.repository.PauseRepository
 import com.minimalphone.core.data.repository.UsageStatsRepository
 import com.minimalphone.core.domain.quarantine.QuarantineEngine
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.AppTimeLimit
 import com.minimalphone.core.model.InstalledApp
+import com.minimalphone.core.model.PauseConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,7 +38,8 @@ data class AppsManagementUiState(
     val managedCount: Int = 0,
     val quarantinedCount: Int = 0,
     val limitsMap: Map<String, AppTimeLimit> = emptyMap(),
-    val usageMinutesMap: Map<String, Long> = emptyMap()
+    val usageMinutesMap: Map<String, Long> = emptyMap(),
+    val pauseConfigsMap: Map<String, PauseConfig> = emptyMap()
 )
 
 @HiltViewModel
@@ -44,19 +47,21 @@ class AppsManagementViewModel @Inject constructor(
     private val appRepository: AppRepository,
     private val appTimeLimitRepository: AppTimeLimitRepository,
     private val usageStatsRepository: UsageStatsRepository,
-    private val quarantineEngine: QuarantineEngine = QuarantineEngine()
+    private val quarantineEngine: QuarantineEngine = QuarantineEngine(),
+    private val pauseRepository: PauseRepository? = null
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
     private val _activeFilter = MutableStateFlow(AppListFilter.ALL)
 
     val uiState: StateFlow<AppsManagementUiState> = combine(
-        appRepository.getAllApps(),
-        _searchQuery,
-        _activeFilter,
+        combine(appRepository.getAllApps(), _searchQuery, _activeFilter) { apps, query, filter ->
+            Triple(apps, query, filter)
+        },
         appTimeLimitRepository.observeAllLimits(),
-        usageStatsRepository.getDailyUsageSummary()
-    ) { allApps, query, filter, limits, usageSummary ->
+        usageStatsRepository.getDailyUsageSummary(),
+        pauseRepository?.observeAllConfigs() ?: kotlinx.coroutines.flow.flowOf(emptyList())
+    ) { (allApps, query, filter), limits, usageSummary, pauseConfigs ->
         val now = System.currentTimeMillis()
         val filtered = allApps.filter { app ->
             val matchesQuery = query.isBlank() ||
@@ -76,6 +81,7 @@ class AppsManagementViewModel @Inject constructor(
 
         val limitsMap = limits.associateBy { it.packageName }
         val usageMap = usageSummary.appStats.associate { it.packageName to it.totalMinutes }
+        val pauseMap = pauseConfigs.associateBy { it.packageName }
 
         AppsManagementUiState(
             searchQuery = query,
@@ -87,7 +93,8 @@ class AppsManagementViewModel @Inject constructor(
             managedCount = allApps.count { it.category == AppCategory.MANAGED },
             quarantinedCount = allApps.count { quarantineEngine.isQuarantined(it.quarantineUntil, now) },
             limitsMap = limitsMap,
-            usageMinutesMap = usageMap
+            usageMinutesMap = usageMap,
+            pauseConfigsMap = pauseMap
         )
     }.stateIn(
         scope = viewModelScope,
@@ -152,5 +159,11 @@ class AppsManagementViewModel @Inject constructor(
 
     fun formatRemainingQuarantine(quarantineUntil: Long?): String {
         return quarantineEngine.remainingHours(quarantineUntil, System.currentTimeMillis())
+    }
+
+    fun saveAppPauseConfig(config: PauseConfig) {
+        viewModelScope.launch {
+            pauseRepository?.saveAppPauseConfig(config)
+        }
     }
 }
