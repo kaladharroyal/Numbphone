@@ -123,17 +123,11 @@ class DefaultUsageStatsRepository @Inject constructor(
             var totalTime = 0L
             var managedTime = 0L
             var essentialTime = 0L
+            val excludedKeywords = listOf("nexuslauncher", "quickstep", "inputmethod", "keyboard", "keyguard")
 
             for ((pkg, timeForeground) in aggregatedStats) {
                 val lowerPkg = pkg.lowercase()
-                if (lowerPkg == "android" ||
-                    lowerPkg == "com.android.systemui" ||
-                    lowerPkg.contains("nexuslauncher") ||
-                    lowerPkg.contains("quickstep") ||
-                    lowerPkg.contains("inputmethod") ||
-                    lowerPkg.contains("keyboard") ||
-                    lowerPkg.contains("keyguard")
-                ) {
+                if (lowerPkg == "android" || lowerPkg == "com.android.systemui" || excludedKeywords.any(lowerPkg::contains)) {
                     continue
                 }
 

@@ -95,46 +95,19 @@ object SystemHealthHelper {
     }
 
     fun getOemGuidance(): String? {
-        val manufacturer = Build.MANUFACTURER.lowercase()
+        val m = Build.MANUFACTURER.lowercase()
         return when {
-            manufacturer.contains("samsung") ->
+            m.contains("samsung") ->
                 "Samsung OneUI: In Device Care > Battery > Background usage limits, add NumbPhone to 'Never sleeping apps'."
-            isMiui() ->
+            m.contains("xiaomi") || m.contains("redmi") || m.contains("poco") ->
                 "MIUI: Go to Apps > Manage Apps > NumbPhone > Battery saver > select 'No restrictions'."
-            isEmui() ->
-                "EMUI: Go to Settings > Battery > App Launch > NumbPhone > set to 'Manage manually'."
-            isColorOs() ->
+            m.contains("oppo") || m.contains("realme") ->
                 "ColorOS/Realme: In App info > Battery usage, enable 'Allow background activity'."
-            isOxygenOs() ->
+            m.contains("oneplus") ->
                 "OxygenOS: Set Battery optimization to 'Don't optimize' and lock NumbPhone in Recent Apps."
-            isHuawei() ->
+            m.contains("huawei") || m.contains("honor") ->
                 "Huawei/Honor: In Battery > App Launch, set NumbPhone to 'Manage manually' with all toggles ON."
             else -> null
         }
-    }
-
-    private fun isMiui(): Boolean {
-        val m = Build.MANUFACTURER.lowercase()
-        return m.contains("xiaomi") || m.contains("redmi") || m.contains("poco")
-    }
-
-    private fun isEmui(): Boolean {
-        val m = Build.MANUFACTURER.lowercase()
-        return m.contains("huawei")
-    }
-
-    private fun isColorOs(): Boolean {
-        val m = Build.MANUFACTURER.lowercase()
-        return m.contains("oppo") || m.contains("realme")
-    }
-
-    private fun isOxygenOs(): Boolean {
-        val m = Build.MANUFACTURER.lowercase()
-        return m.contains("oneplus")
-    }
-
-    private fun isHuawei(): Boolean {
-        val m = Build.MANUFACTURER.lowercase()
-        return m.contains("huawei") || m.contains("honor")
     }
 }
