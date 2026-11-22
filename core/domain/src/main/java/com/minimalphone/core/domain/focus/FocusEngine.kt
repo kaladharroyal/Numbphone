@@ -1,17 +1,19 @@
 package com.minimalphone.core.domain.focus
 
+import android.content.Context
+import com.minimalphone.core.common.DndHelper
+import com.minimalphone.core.common.GrayscaleHelper
 import com.minimalphone.core.data.repository.FocusSessionRepository
 import com.minimalphone.core.model.FocusGoal
 import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSession
 import com.minimalphone.core.model.SessionStatus
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
-import android.content.Context
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
@@ -165,8 +167,8 @@ class CompleteFocusSessionUseCase @Inject constructor(
     suspend operator fun invoke(sessionId: String) {
         focusSessionRepository.completeSession(sessionId)
         context?.let { ctx ->
-            com.minimalphone.core.common.DndHelper.restoreNormalNotifications(ctx)
-            com.minimalphone.core.common.GrayscaleHelper.setGrayscaleEnabled(ctx, false)
+            DndHelper.restoreNormalNotifications(ctx)
+            GrayscaleHelper.setGrayscaleEnabled(ctx, false)
         }
     }
 }

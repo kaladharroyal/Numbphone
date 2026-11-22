@@ -1,6 +1,5 @@
 package com.minimalphone.core.domain.taxonomy
 
-import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.AppTaxonomy
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,33 +15,22 @@ class AppTaxonomyClassifier @Inject constructor() {
         val lowerLabel = label.lowercase()
 
         return when {
-            lowerPkg.contains("dialer") || lowerPkg.contains("telecom") || lowerPkg.contains("phone") ||
-                    lowerPkg.contains("messaging") || lowerPkg.contains("mms") || lowerPkg.contains("whatsapp") ||
-                    lowerPkg.contains("telegram") || lowerPkg.contains("signal") ||
+            listOf("dialer", "telecom", "phone", "messaging", "mms", "whatsapp", "telegram", "signal").any(lowerPkg::contains) ||
                     lowerLabel.contains("phone") || lowerLabel.contains("messages") -> AppTaxonomy.COMMUNICATION
 
-            lowerPkg.contains("instagram") || lowerPkg.contains("twitter") || lowerPkg.contains("tiktok") ||
-                    lowerPkg.contains("facebook") || lowerPkg.contains("reddit") || lowerPkg.contains("snapchat") ||
-                    lowerPkg.contains("threads") -> AppTaxonomy.SOCIAL_MEDIA
+            listOf("instagram", "twitter", "tiktok", "facebook", "reddit", "snapchat", "threads").any(lowerPkg::contains) -> AppTaxonomy.SOCIAL_MEDIA
 
-            lowerPkg.contains("youtube") || lowerPkg.contains("netflix") || lowerPkg.contains("spotify") ||
-                    lowerPkg.contains("games") || lowerPkg.contains("twitch") || lowerPkg.contains("primevideo") -> AppTaxonomy.ENTERTAINMENT_GAMES
+            listOf("youtube", "netflix", "spotify", "games", "twitch", "primevideo").any(lowerPkg::contains) -> AppTaxonomy.ENTERTAINMENT_GAMES
 
-            lowerPkg.contains("docs") || lowerPkg.contains("sheets") || lowerPkg.contains("slides") ||
-                    lowerPkg.contains("notion") || lowerPkg.contains("obsidian") || lowerPkg.contains("calendar") ||
-                    lowerPkg.contains("notes") || lowerPkg.contains("todo") || lowerPkg.contains("trello") -> AppTaxonomy.PRODUCTIVITY
+            listOf("docs", "sheets", "slides", "notion", "obsidian", "calendar", "notes", "todo", "trello").any(lowerPkg::contains) -> AppTaxonomy.PRODUCTIVITY
 
-            lowerPkg.contains("kindle") || lowerPkg.contains("books") || lowerPkg.contains("medium") ||
-                    lowerPkg.contains("duolingo") || lowerPkg.contains("anki") || lowerPkg.contains("coursera") -> AppTaxonomy.READING_EDUCATION
+            listOf("kindle", "books", "medium", "duolingo", "anki", "coursera").any(lowerPkg::contains) -> AppTaxonomy.READING_EDUCATION
 
-            lowerPkg.contains("bank") || lowerPkg.contains("pay") || lowerPkg.contains("wallet") ||
-                    lowerPkg.contains("finance") || lowerPkg.contains("crypto") -> AppTaxonomy.FINANCE
+            listOf("bank", "pay", "wallet", "finance", "crypto").any(lowerPkg::contains) -> AppTaxonomy.FINANCE
 
-            lowerPkg.contains("fit") || lowerPkg.contains("health") || lowerPkg.contains("strava") ||
-                    lowerPkg.contains("workout") -> AppTaxonomy.HEALTH
+            listOf("fit", "health", "strava", "workout").any(lowerPkg::contains) -> AppTaxonomy.HEALTH
 
-            lowerPkg.contains("settings") || lowerPkg.contains("clock") || lowerPkg.contains("camera") ||
-                    lowerPkg.contains("calculator") || lowerPkg.contains("files") -> AppTaxonomy.UTILITY_TOOLS
+            listOf("settings", "clock", "camera", "calculator", "files").any(lowerPkg::contains) -> AppTaxonomy.UTILITY_TOOLS
 
             else -> AppTaxonomy.OTHER
         }
@@ -51,8 +39,7 @@ class AppTaxonomyClassifier @Inject constructor() {
     fun isEssentialByDefault(packageName: String, label: String): Boolean {
         val lowerPkg = packageName.lowercase()
         val lowerLabel = label.lowercase()
-        return lowerLabel == "phone" || lowerLabel == "messages" || lowerLabel == "settings" ||
-                lowerLabel == "camera" || lowerLabel == "clock" || lowerLabel == "dialer" ||
-                lowerPkg.contains("dialer") || lowerPkg.contains("telecom")
+        val essentialLabels = setOf("phone", "messages", "settings", "camera", "clock", "dialer")
+        return lowerLabel in essentialLabels || lowerPkg.contains("dialer") || lowerPkg.contains("telecom")
     }
 }

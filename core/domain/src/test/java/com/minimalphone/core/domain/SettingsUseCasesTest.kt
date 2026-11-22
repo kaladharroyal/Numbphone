@@ -62,21 +62,11 @@ class SettingsUseCasesTest {
 
     private lateinit var settingsRepository: FakeSettingsRepository
     private lateinit var getSettingsUseCase: GetSettingsUseCase
-    private lateinit var setOnboardingCompletedUseCase: SetOnboardingCompletedUseCase
-    private lateinit var updateAdaptiveFrictionUseCase: UpdateAdaptiveFrictionUseCase
-    private lateinit var updateDefaultFocusDurationUseCase: UpdateDefaultFocusDurationUseCase
-    private lateinit var updateLocalAnalyticsUseCase: UpdateLocalAnalyticsUseCase
-    private lateinit var updateAppThemeUseCase: UpdateAppThemeUseCase
 
     @Before
     fun setUp() {
         settingsRepository = FakeSettingsRepository()
         getSettingsUseCase = GetSettingsUseCase(settingsRepository)
-        setOnboardingCompletedUseCase = SetOnboardingCompletedUseCase(settingsRepository)
-        updateAdaptiveFrictionUseCase = UpdateAdaptiveFrictionUseCase(settingsRepository)
-        updateDefaultFocusDurationUseCase = UpdateDefaultFocusDurationUseCase(settingsRepository)
-        updateLocalAnalyticsUseCase = UpdateLocalAnalyticsUseCase(settingsRepository)
-        updateAppThemeUseCase = UpdateAppThemeUseCase(settingsRepository)
     }
 
     @Test
@@ -91,29 +81,28 @@ class SettingsUseCasesTest {
 
     @Test
     fun setOnboardingCompleted_updatesFlow() = runTest {
-        setOnboardingCompletedUseCase(true)
+        settingsRepository.setOnboardingCompleted(true)
         val updated = getSettingsUseCase().first()
         assertTrue(updated.isOnboardingCompleted)
     }
 
     @Test
     fun updateFocusDuration_updatesFlow() = runTest {
-        updateDefaultFocusDurationUseCase(45)
+        settingsRepository.setDefaultFocusDurationMinutes(45)
         val updated = getSettingsUseCase().first()
         assertEquals(45, updated.defaultFocusDurationMinutes)
     }
 
     @Test
     fun updateAppTheme_updatesFlow() = runTest {
-        updateAppThemeUseCase(AppTheme.E_INK_PAPER)
+        settingsRepository.setAppTheme(AppTheme.E_INK_PAPER)
         val updated = getSettingsUseCase().first()
         assertEquals(AppTheme.E_INK_PAPER, updated.appTheme)
     }
 
     @Test
     fun updateAutoGrayscaleInFocus_updatesFlow() = runTest {
-        val useCase = UpdateAutoGrayscaleInFocusUseCase(settingsRepository)
-        useCase(true)
+        settingsRepository.setAutoGrayscaleInFocusEnabled(true)
         val updated = getSettingsUseCase().first()
         assertTrue(updated.isAutoGrayscaleInFocusEnabled)
     }
