@@ -10,6 +10,9 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
+import com.minimalphone.core.model.AutoLaunchMode
+import com.minimalphone.core.model.GestureAction
+import com.minimalphone.core.model.GestureType
 import com.minimalphone.core.model.QuarantineHours
 import com.minimalphone.core.model.SettingsGuardMode
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -47,6 +50,10 @@ class DefaultSettingsRepository @Inject constructor(
         val DEFAULT_SESSION_MINUTES = intPreferencesKey("default_session_minutes")
         val DEFAULT_PAUSE_STYLE = stringPreferencesKey("default_pause_style")
         val PROGRESSIVE_DELAY_ENABLED = booleanPreferencesKey("progressive_delay_enabled")
+        val GESTURE_CONFIG = stringPreferencesKey("gesture_config")
+        val SEARCH_AUTO_LAUNCH_MODE = stringPreferencesKey("search_auto_launch_mode")
+        val SEARCH_FUZZY_ENABLED = booleanPreferencesKey("search_fuzzy_enabled")
+        val GESTURE_HINT_SHOWN = booleanPreferencesKey("gesture_hint_shown")
     }
 
     override val isOnboardingCompleted: Flow<Boolean> = dataStore.data
@@ -266,6 +273,74 @@ class DefaultSettingsRepository @Inject constructor(
     override suspend fun setProgressiveDelayEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.PROGRESSIVE_DELAY_ENABLED] = enabled
+        }
+    }
+
+    override val gestureConfig: Flow<Map<GestureType, GestureAction>> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            val serialized = preferences[PreferencesKeys.GESTURE_CONFIG] ?: ""
+            GestureAction.deserializeMap(serialized)
+        }
+
+    override val searchAutoLaunchMode: Flow<AutoLaunchMode> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.SEARCH_AUTO_LAUNCH_MODE]?.let {
+                runCatching { AutoLaunchMode.valueOf(it) }.getOrNull()
+            } ?: AutoLaunchMode.ESSENTIAL_AND_PINNED
+        }
+
+    override val searchFuzzyEnabled: Flow<Boolean> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.SEARCH_FUZZY_ENABLED] ?: true
+        }
+
+    override val gestureHintShown: Flow<Boolean> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.GESTURE_HINT_SHOWN] ?: false
+        }
+
+    override suspend fun setGestureAction(type: GestureType, action: GestureAction) {
+        dataStore.edit { preferences ->
+            val serialized = preferences[PreferencesKeys.GESTURE_CONFIG] ?: ""
+            val currentMap = GestureAction.deserializeMap(serialized).toMutableMap()
+            currentMap[type] = action
+            preferences[PreferencesKeys.GESTURE_CONFIG] = GestureAction.serializeMap(currentMap)
+        }
+    }
+
+    override suspend fun setGestureConfig(config: Map<GestureType, GestureAction>) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.GESTURE_CONFIG] = GestureAction.serializeMap(config)
+        }
+    }
+
+    override suspend fun setSearchAutoLaunchMode(mode: AutoLaunchMode) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SEARCH_AUTO_LAUNCH_MODE] = mode.name
+        }
+    }
+
+    override suspend fun setSearchFuzzyEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.SEARCH_FUZZY_ENABLED] = enabled
+        }
+    }
+
+    override suspend fun setGestureHintShown(shown: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.GESTURE_HINT_SHOWN] = shown
         }
     }
 }

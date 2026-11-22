@@ -4,10 +4,39 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.provider.Settings
 import android.text.TextUtils
+import java.lang.ref.WeakReference
 
 object AccessibilityHelper {
+
+    private var serviceRef: WeakReference<AccessibilityService>? = null
+
+    fun registerService(service: AccessibilityService) {
+        serviceRef = WeakReference(service)
+    }
+
+    fun unregisterService() {
+        serviceRef = null
+    }
+
+    fun isServiceConnected(): Boolean {
+        return serviceRef?.get() != null
+    }
+
+    /**
+     * Locks the screen using AccessibilityService on API 28+ (Pie).
+     * Zero new permissions and zero window content access.
+     */
+    fun lockScreen(): Boolean {
+        val service = serviceRef?.get() ?: return false
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)
+        } else {
+            false
+        }
+    }
 
     fun isAccessibilityServiceEnabled(
         context: Context,

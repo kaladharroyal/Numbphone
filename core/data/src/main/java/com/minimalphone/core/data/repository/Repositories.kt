@@ -63,6 +63,10 @@ interface SettingsRepository {
     val defaultSessionMinutes: Flow<Int>
     val defaultPauseStyle: Flow<com.minimalphone.core.model.PauseStyle>
     val progressiveDelayEnabled: Flow<Boolean>
+    val gestureConfig: Flow<Map<com.minimalphone.core.model.GestureType, com.minimalphone.core.model.GestureAction>>
+    val searchAutoLaunchMode: Flow<com.minimalphone.core.model.AutoLaunchMode>
+    val searchFuzzyEnabled: Flow<Boolean>
+    val gestureHintShown: Flow<Boolean>
 
     suspend fun setOnboardingCompleted(completed: Boolean)
     suspend fun setAdaptiveFrictionEnabled(enabled: Boolean)
@@ -79,6 +83,11 @@ interface SettingsRepository {
     suspend fun setDefaultSessionMinutes(minutes: Int)
     suspend fun setDefaultPauseStyle(style: com.minimalphone.core.model.PauseStyle)
     suspend fun setProgressiveDelayEnabled(enabled: Boolean)
+    suspend fun setGestureAction(type: com.minimalphone.core.model.GestureType, action: com.minimalphone.core.model.GestureAction)
+    suspend fun setGestureConfig(config: Map<com.minimalphone.core.model.GestureType, com.minimalphone.core.model.GestureAction>)
+    suspend fun setSearchAutoLaunchMode(mode: com.minimalphone.core.model.AutoLaunchMode)
+    suspend fun setSearchFuzzyEnabled(enabled: Boolean)
+    suspend fun setGestureHintShown(shown: Boolean)
 }
 
 /**
@@ -107,6 +116,8 @@ interface AppRuleRepository {
     fun observeQuarantinedCount(): Flow<Int>
     suspend fun getRule(packageName: String): AppRule?
     suspend fun saveRule(rule: AppRule)
+    fun observeAllRules(): Flow<List<AppRule>> = kotlinx.coroutines.flow.emptyFlow()
+    suspend fun getCustomLabel(packageName: String): String? = getRule(packageName)?.customLabel
 }
 
 /**

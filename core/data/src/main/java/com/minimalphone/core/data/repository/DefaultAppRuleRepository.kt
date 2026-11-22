@@ -71,6 +71,14 @@ class DefaultAppRuleRepository @Inject constructor(
         )
     }
 
+    override fun observeAllRules(): Flow<List<AppRule>> {
+        return appRuleDao.observeAllRules().map { list -> list.map { it.toModel() } }
+    }
+
+    override suspend fun getCustomLabel(packageName: String): String? {
+        return appRuleDao.getRule(packageName)?.customLabel
+    }
+
     private fun AppRuleEntity.toModel(): AppRule = AppRule(
         packageName = packageName,
         category = category,

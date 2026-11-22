@@ -162,6 +162,11 @@ interface EssentialAppDao {
 }
 
 
+data class AppLaunchCountTuple(
+    val packageName: String,
+    val totalLaunches: Int
+)
+
 @Dao
 interface DailyAppUsageDao {
 
@@ -173,6 +178,12 @@ interface DailyAppUsageDao {
 
     @Query("SELECT launchCount FROM daily_app_usage WHERE packageName = :packageName AND date = :date LIMIT 1")
     suspend fun getLaunchCount(packageName: String, date: String): Int?
+
+    @Query("SELECT SUM(launchCount) FROM daily_app_usage WHERE packageName = :packageName AND date >= :date")
+    suspend fun launchCountSince(packageName: String, date: String): Int?
+
+    @Query("SELECT packageName, SUM(launchCount) as totalLaunches FROM daily_app_usage WHERE date >= :date GROUP BY packageName")
+    suspend fun getLaunchCountsSince(date: String): List<AppLaunchCountTuple>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(usage: com.minimalphone.core.data.db.entity.DailyAppUsageEntity)

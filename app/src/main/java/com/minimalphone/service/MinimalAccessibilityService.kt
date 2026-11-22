@@ -110,6 +110,7 @@ class MinimalAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        com.minimalphone.core.common.AccessibilityHelper.registerService(this)
         MinimalLog.i(TAG, "Minimal Phone Bypass Protection Service Connected.")
     }
 
@@ -549,6 +550,7 @@ class MinimalAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        com.minimalphone.core.common.AccessibilityHelper.unregisterService()
         stopMonitoring()
         overlayController.hideOverlay()
         reinterventionJob?.cancel()
