@@ -55,7 +55,8 @@ data class SystemDiagnosticsData(
     val isSettingsGuardReady: Boolean = false,
     val isUninstallLockActive: Boolean = false,
     val unreviewedQuarantinedAppsCount: Int = 0,
-    val isPauseOverlayReady: Boolean = false
+    val isPauseOverlayReady: Boolean = false,
+    val isLockGestureWarning: Boolean = false
 )
 
 class ObserveSystemDiagnosticsUseCase @Inject constructor(
@@ -74,7 +75,8 @@ class ObserveSystemDiagnosticsUseCase @Inject constructor(
         isSettingsGuardReady: Boolean = false,
         isUninstallLockActive: Boolean = false,
         unreviewedQuarantinedAppsCount: Int = 0,
-        isPauseOverlayReady: Boolean = false
+        isPauseOverlayReady: Boolean = false,
+        isLockGestureWarning: Boolean = false
     ): Flow<SystemDiagnosticsData> {
         return combine(
             focusSessionRepository.getActiveSession(),
@@ -94,7 +96,8 @@ class ObserveSystemDiagnosticsUseCase @Inject constructor(
                 isSettingsGuardReady = isSettingsGuardReady,
                 isUninstallLockActive = isUninstallLockActive,
                 unreviewedQuarantinedAppsCount = unreviewedQuarantinedAppsCount,
-                isPauseOverlayReady = isPauseOverlayReady
+                isPauseOverlayReady = isPauseOverlayReady,
+                isLockGestureWarning = isLockGestureWarning
             )
         }
     }

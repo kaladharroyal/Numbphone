@@ -64,6 +64,9 @@ class ExportBackupJsonUseCase @Inject constructor(
         val defaultSessionMin = runCatching { settingsRepository.defaultSessionMinutes.first() }.getOrDefault(10)
         val defaultStyle = runCatching { settingsRepository.defaultPauseStyle.first() }.getOrDefault(PauseStyle.BREATHE)
         val progressiveDelay = runCatching { settingsRepository.progressiveDelayEnabled.first() }.getOrDefault(false)
+        val gestureConfig = runCatching { settingsRepository.gestureConfig.first() }.getOrDefault(com.minimalphone.core.model.GestureAction.defaultGestureConfig())
+        val autoLaunchMode = runCatching { settingsRepository.searchAutoLaunchMode.first() }.getOrDefault(com.minimalphone.core.model.AutoLaunchMode.ESSENTIAL_AND_PINNED)
+        val searchFuzzy = runCatching { settingsRepository.searchFuzzyEnabled.first() }.getOrDefault(true)
 
         val timeLimits = appTimeLimitRepository.observeAllLimits().first()
         val schedules = scheduleRepository.observeSchedules().first()
@@ -72,7 +75,7 @@ class ExportBackupJsonUseCase @Inject constructor(
         val pauseConfigs = pauseRepository?.observeAllConfigs()?.first() ?: emptyList()
 
         val root = JSONObject()
-        root.put("version", 3)
+        root.put("version", 4)
         root.put("timestamp", System.currentTimeMillis())
 
         val settingsObj = JSONObject()
@@ -87,6 +90,9 @@ class ExportBackupJsonUseCase @Inject constructor(
         settingsObj.put("defaultSessionMinutes", defaultSessionMin)
         settingsObj.put("defaultPauseStyle", defaultStyle.name)
         settingsObj.put("progressiveDelayEnabled", progressiveDelay)
+        settingsObj.put("gestureConfig", com.minimalphone.core.model.GestureAction.serializeMap(gestureConfig))
+        settingsObj.put("searchAutoLaunchMode", autoLaunchMode.name)
+        settingsObj.put("searchFuzzyEnabled", searchFuzzy)
         root.put("settings", settingsObj)
 
         val appsArray = JSONArray()
@@ -241,6 +247,17 @@ class ImportBackupJsonUseCase @Inject constructor(
             }
             if (settingsObj.has("progressiveDelayEnabled")) {
                 settingsRepository.setProgressiveDelayEnabled(settingsObj.getBoolean("progressiveDelayEnabled"))
+            }
+            if (settingsObj.has("gestureConfig")) {
+                val config = com.minimalphone.core.model.GestureAction.deserializeMap(settingsObj.getString("gestureConfig"))
+                settingsRepository.setGestureConfig(config)
+            }
+            if (settingsObj.has("searchAutoLaunchMode")) {
+                val mode = runCatching { com.minimalphone.core.model.AutoLaunchMode.valueOf(settingsObj.getString("searchAutoLaunchMode")) }.getOrDefault(com.minimalphone.core.model.AutoLaunchMode.ESSENTIAL_AND_PINNED)
+                settingsRepository.setSearchAutoLaunchMode(mode)
+            }
+            if (settingsObj.has("searchFuzzyEnabled")) {
+                settingsRepository.setSearchFuzzyEnabled(settingsObj.getBoolean("searchFuzzyEnabled"))
             }
 
             // 2. Restore App Classifications & Favorites
