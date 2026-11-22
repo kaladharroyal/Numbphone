@@ -62,6 +62,10 @@ class DiagnosticsViewModel @Inject constructor(
 
             val quarantinedCount = appRuleRepository.observeQuarantinedCount().first()
 
+            val gestureConfig = settingsRepository.gestureConfig.first()
+            val hasLockGesture = gestureConfig.values.any { it is com.minimalphone.core.model.GestureAction.LockScreen }
+            val isLockWarning = hasLockGesture && !isAccessibilityEnabled
+
             observeSystemDiagnosticsUseCase(
                 isDefaultLauncher = isDefaultLauncher,
                 isAccessibilityEnabled = isAccessibilityEnabled,
@@ -74,7 +78,8 @@ class DiagnosticsViewModel @Inject constructor(
                 isSettingsGuardReady = isGuardReady,
                 isUninstallLockActive = isUninstallActive,
                 unreviewedQuarantinedAppsCount = quarantinedCount,
-                isPauseOverlayReady = isAccessibilityEnabled
+                isPauseOverlayReady = isAccessibilityEnabled,
+                isLockGestureWarning = isLockWarning
             ).collect { data ->
                 _diagnosticsState.value = data
             }

@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -77,8 +79,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.minimalphone.core.model.AppTheme
 import com.minimalphone.core.model.AppTimeLimit
+import com.minimalphone.core.model.AutoLaunchMode
 import com.minimalphone.core.model.EssentialApp
+import com.minimalphone.core.model.GestureAction
+import com.minimalphone.core.model.GestureType
 import com.minimalphone.core.model.InstalledApp
+import com.minimalphone.core.ui.theme.DarkSurface
 import com.minimalphone.core.ui.theme.MutedText
 
 enum class SettingsSection(val title: String, val subtitle: String) {
@@ -105,6 +111,9 @@ fun SettingsScreen(
     val essentialApps by viewModel.essentialApps.collectAsStateWithLifecycle()
     val timeLimits by viewModel.timeLimits.collectAsStateWithLifecycle()
     val allInstalledApps by viewModel.allInstalledApps.collectAsStateWithLifecycle()
+    val gestureConfig by viewModel.gestureConfig.collectAsStateWithLifecycle()
+    val searchAutoLaunchMode by viewModel.searchAutoLaunchMode.collectAsStateWithLifecycle()
+    val searchFuzzyEnabled by viewModel.searchFuzzyEnabled.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var currentSection by remember { mutableStateOf(SettingsSection.MAIN) }
@@ -223,7 +232,14 @@ fun SettingsScreen(
                     SettingsSection.APPEARANCE -> {
                         AppearanceSettingsView(
                             currentTheme = settings.appTheme,
-                            onSelectTheme = { viewModel.onSelectTheme(it) }
+                            onSelectTheme = { viewModel.onSelectTheme(it) },
+                            gestureConfig = gestureConfig,
+                            searchAutoLaunchMode = searchAutoLaunchMode,
+                            searchFuzzyEnabled = searchFuzzyEnabled,
+                            allInstalledApps = allInstalledApps,
+                            onSetGestureAction = { type, action -> viewModel.onSetGestureAction(type, action) },
+                            onSetSearchAutoLaunchMode = { viewModel.onSetSearchAutoLaunchMode(it) },
+                            onSetSearchFuzzyEnabled = { viewModel.onSetSearchFuzzyEnabled(it) }
                         )
                     }
                     SettingsSection.FOCUS_DETOX -> {
@@ -496,8 +512,18 @@ private fun SettingsHubView(
 @Composable
 private fun AppearanceSettingsView(
     currentTheme: AppTheme,
-    onSelectTheme: (AppTheme) -> Unit
+    onSelectTheme: (AppTheme) -> Unit,
+    gestureConfig: Map<GestureType, GestureAction>,
+    searchAutoLaunchMode: AutoLaunchMode,
+    searchFuzzyEnabled: Boolean,
+    allInstalledApps: List<InstalledApp>,
+    onSetGestureAction: (GestureType, GestureAction) -> Unit,
+    onSetSearchAutoLaunchMode: (AutoLaunchMode) -> Unit,
+    onSetSearchFuzzyEnabled: (Boolean) -> Unit
 ) {
+    var selectedGestureForActionPicker by remember { mutableStateOf<GestureType?>(null) }
+    var showAppPickerForGesture by remember { mutableStateOf<GestureType?>(null) }
+
     LazyColumn(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(bottom = 32.dp)
@@ -511,6 +537,285 @@ private fun AppearanceSettingsView(
                 currentTheme = currentTheme,
                 onSelectTheme = onSelectTheme
             )
+        }
+
+        item {
+            SectionHeader(title = "HOME GESTURES")
+        }
+
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                GestureType.entries.forEach { gestureType ->
+                    val action = gestureConfig[gestureType] ?: GestureAction.None
+                    val gestureLabel = when (gestureType) {
+                        GestureType.SWIPE_UP -> "Swipe Up"
+                        GestureType.SWIPE_DOWN -> "Swipe Down"
+                        GestureType.SWIPE_LEFT -> "Swipe Left"
+                        GestureType.SWIPE_RIGHT -> "Swipe Right"
+                        GestureType.DOUBLE_TAP -> "Double Tap"
+                        GestureType.LONG_PRESS_CLOCK -> "Long-press Clock"
+                    }
+                    val actionLabel = when (action) {
+                        is GestureAction.None -> "None"
+                        is GestureAction.OpenSearch -> "Open Search"
+                        is GestureAction.OpenQuickControl -> "Open Control Center"
+                        is GestureAction.OpenSettings -> "Open Settings"
+                        is GestureAction.OpenFocusScreen -> "Open Focus Mode"
+                        is GestureAction.LaunchApp -> {
+                            val target = allInstalledApps.find { it.packageName == action.packageName }
+                            "Launch ${target?.label ?: action.packageName}"
+                        }
+                        is GestureAction.LockScreen -> "Lock Screen"
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedGestureForActionPicker = gestureType }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = gestureLabel,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = actionLabel,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = null,
+                                tint = MutedText,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            SectionHeader(title = "HOME SEARCH")
+        }
+
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
+                    .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Auto-Launch on Single Match",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "Automatically opens the app after 500 ms when only one search result matches.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MutedText
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        AutoLaunchMode.OFF to "Off",
+                        AutoLaunchMode.ESSENTIAL_AND_PINNED to "Essential & Pinned",
+                        AutoLaunchMode.ALL to "All Apps"
+                    ).forEach { (mode, label) ->
+                        val isSelected = searchAutoLaunchMode == mode
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable { onSetSearchAutoLaunchMode(mode) }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            SettingToggleCard(
+                title = "Fuzzy Typo Tolerance",
+                description = "Allows 1-character typo tolerance when searching queries with 4 or more letters.",
+                isChecked = searchFuzzyEnabled,
+                onCheckedChange = onSetSearchFuzzyEnabled
+            )
+        }
+    }
+
+    // Action Picker Dialog
+    if (selectedGestureForActionPicker != null) {
+        val gesture = selectedGestureForActionPicker!!
+        val currentAction = gestureConfig[gesture] ?: GestureAction.None
+
+        Dialog(
+            onDismissRequest = { selectedGestureForActionPicker = null }
+        ) {
+            androidx.compose.material3.Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = DarkSurface,
+                modifier = Modifier.fillMaxWidth(0.9f)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Action for ${gesture.name.replace("_", " ")}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    val actionOptions = listOf(
+                        GestureAction.None to "None",
+                        GestureAction.OpenSearch to "Open Search",
+                        GestureAction.OpenQuickControl to "Open Control Center",
+                        GestureAction.OpenSettings to "Open Settings",
+                        GestureAction.OpenFocusScreen to "Open Focus Mode",
+                        GestureAction.LockScreen to "Lock Screen"
+                    )
+
+                    actionOptions.forEach { (action, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onSetGestureAction(gesture, action)
+                                    selectedGestureForActionPicker = null
+                                }
+                                .padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (currentAction == action) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+
+                    // Option to choose an app
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showAppPickerForGesture = gesture
+                                selectedGestureForActionPicker = null
+                            }
+                            .padding(vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (currentAction is GestureAction.LaunchApp) "Launch App (${currentAction.packageName})" else "Launch App…",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // App Picker Dialog for LaunchApp action
+    if (showAppPickerForGesture != null) {
+        val gesture = showAppPickerForGesture!!
+        Dialog(
+            onDismissRequest = { showAppPickerForGesture = null }
+        ) {
+            androidx.compose.material3.Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = DarkSurface,
+                modifier = Modifier.fillMaxWidth(0.9f)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Select App to Launch",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(allInstalledApps, key = { it.packageName }) { app ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onSetGestureAction(gesture, GestureAction.LaunchApp(app.packageName))
+                                        showAppPickerForGesture = null
+                                    }
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = app.label,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

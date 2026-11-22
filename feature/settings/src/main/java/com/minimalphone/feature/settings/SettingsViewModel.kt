@@ -14,7 +14,10 @@ import com.minimalphone.core.domain.ImportBackupJsonUseCase
 import com.minimalphone.core.domain.UserSettings
 import com.minimalphone.core.model.AppTheme
 import com.minimalphone.core.model.AppTimeLimit
+import com.minimalphone.core.model.AutoLaunchMode
 import com.minimalphone.core.model.EssentialApp
+import com.minimalphone.core.model.GestureAction
+import com.minimalphone.core.model.GestureType
 import com.minimalphone.core.model.InstalledApp
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,6 +70,30 @@ class SettingsViewModel @Inject constructor(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = emptyList()
+            )
+
+    val gestureConfig: StateFlow<Map<GestureType, GestureAction>> =
+        settingsRepository.gestureConfig
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = GestureAction.defaultGestureConfig()
+            )
+
+    val searchAutoLaunchMode: StateFlow<AutoLaunchMode> =
+        settingsRepository.searchAutoLaunchMode
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = AutoLaunchMode.ESSENTIAL_AND_PINNED
+            )
+
+    val searchFuzzyEnabled: StateFlow<Boolean> =
+        settingsRepository.searchFuzzyEnabled
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = true
             )
 
     init {
@@ -167,6 +194,24 @@ class SettingsViewModel @Inject constructor(
     fun onRemoveEssentialApp(packageName: String) {
         viewModelScope.launch {
             essentialAppRepository.removeEssentialApp(packageName)
+        }
+    }
+
+    fun onSetGestureAction(type: GestureType, action: GestureAction) {
+        viewModelScope.launch {
+            settingsRepository.setGestureAction(type, action)
+        }
+    }
+
+    fun onSetSearchAutoLaunchMode(mode: AutoLaunchMode) {
+        viewModelScope.launch {
+            settingsRepository.setSearchAutoLaunchMode(mode)
+        }
+    }
+
+    fun onSetSearchFuzzyEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setSearchFuzzyEnabled(enabled)
         }
     }
 }

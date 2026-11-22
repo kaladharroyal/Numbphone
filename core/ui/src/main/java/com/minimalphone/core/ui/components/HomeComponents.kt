@@ -1,6 +1,8 @@
 package com.minimalphone.core.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -72,21 +74,34 @@ fun MinimalClockHeader(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MinimalAppItemRow(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    trailingText: String? = null
+    trailingText: String? = null,
+    onLongClick: (() -> Unit)? = null
 ) {
+    val clickModifier = if (onLongClick != null) {
+        Modifier.combinedClickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = ripple(bounded = true, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)),
+            onClick = onClick,
+            onLongClick = onLongClick
+        )
+    } else {
+        Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = ripple(bounded = true, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)),
+            onClick = onClick
+        )
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(bounded = true, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.12f)),
-                onClick = onClick
-            )
+            .then(clickModifier)
             .padding(vertical = 14.dp, horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween

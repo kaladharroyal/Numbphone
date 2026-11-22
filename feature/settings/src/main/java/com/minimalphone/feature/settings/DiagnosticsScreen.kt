@@ -192,6 +192,19 @@ fun DiagnosticsScreen(
                     )
                 }
 
+                // Diagnostic Check 9: Lock Screen Gesture Warning (M23)
+                if (state.isLockGestureWarning) {
+                    item {
+                        DiagnosticItemCard(
+                            title = "Lock Screen Gesture",
+                            description = "Lock screen gesture is configured, but Accessibility Service is disconnected.",
+                            isPassed = false,
+                            actionLabel = "SERVICE REQUIRED",
+                            onActionClick = { viewModel.openAccessibilitySettings() }
+                        )
+                    }
+                }
+
                 // OEM Specific Guidance Banner
                 state.oemGuidance?.let { guidance ->
                     item {
