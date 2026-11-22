@@ -13,7 +13,7 @@ import com.minimalphone.core.data.repository.UsageStatsRepository
 import com.minimalphone.core.domain.bypass.EvaluateBypassRouteUseCase
 import com.minimalphone.core.domain.bypass.RecordBypassAttemptUseCase
 import com.minimalphone.core.domain.bypass.SettingsGuardConfig
-import com.minimalphone.core.domain.bypass.SettingsGuardDecision
+import com.minimalphone.core.model.SettingsGuardDecision
 import com.minimalphone.core.domain.bypass.SettingsGuardEngine
 import com.minimalphone.core.domain.timelimit.TimeLimitExpiryNotifier
 import com.minimalphone.core.model.AppCategory
@@ -21,6 +21,17 @@ import com.minimalphone.core.model.BypassDecision
 import com.minimalphone.core.model.BypassRoute
 import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.SettingsGuardMode
+import android.app.KeyguardManager
+import android.content.Context
+import android.os.PowerManager
+import android.view.inputmethod.InputMethodManager
+import com.minimalphone.core.domain.pause.ForegroundTracker
+import com.minimalphone.core.domain.pause.PauseDecision
+import com.minimalphone.core.domain.pause.PauseEngine
+import com.minimalphone.core.domain.pause.PauseGrantStore
+import com.minimalphone.core.model.PauseConfig
+import com.minimalphone.core.model.PauseEventKind
+import com.minimalphone.core.model.PauseOutcome
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +74,18 @@ class MinimalAccessibilityService : AccessibilityService() {
 
     @Inject
     lateinit var settingsGuardEngine: SettingsGuardEngine
+
+    @Inject
+    lateinit var pauseEngine: PauseEngine
+
+    @Inject
+    lateinit var pauseGrantStore: PauseGrantStore
+
+    @Inject
+    lateinit var foregroundTracker: ForegroundTracker
+
+    private val overlayController by lazy { MindfulOverlayController(this) }
+    private var reinterventionJob: Job? = null
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -111,8 +134,28 @@ class MinimalAccessibilityService : AccessibilityService() {
 
         // 1. Fast exclusion: Skip Minimal Phone itself to prevent redirect loops
         if (targetPackage == packageName || targetPackage.startsWith("com.minimalphone")) {
+            currentForegroundPackage?.let { pauseGrantStore.onAppBackground(it) }
+            overlayController.hideOverlay()
+            reinterventionJob?.cancel()
             stopMonitoring()
             return
+        }
+
+        // Track foreground transitions with debouncing and IME filtering
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        val enabledImes = imm?.enabledInputMethodList?.map { it.packageName }?.toSet() ?: emptySet()
+        val transition = foregroundTracker.onWindowStateChanged(
+            packageName = targetPackage,
+            className = className,
+            enabledImePackages = enabledImes,
+            ownPackageName = packageName,
+            nowMs = currentTime
+        )
+
+        if (transition != null) {
+            transition.previousPackage?.let { pauseGrantStore.onAppBackground(it) }
+            pauseGrantStore.onAppForeground(transition.currentPackage)
+            reinterventionJob?.cancel()
         }
 
         // 2. Settings Guard (M21) — Active only during active DEEP or DEEP_AND_STRICT sessions
@@ -190,6 +233,50 @@ class MinimalAccessibilityService : AccessibilityService() {
                 when (val decision = evaluateBypassRouteUseCase(targetPackage)) {
                     is BypassDecision.Allow -> {
                         startMonitoringForegroundApp(targetPackage)
+
+                        // 6. External Path: Mindful Pause (M22)
+                        val pauseDecision = pauseEngine.evaluate(targetPackage, BypassRoute.NOTIFICATION)
+                        if (pauseDecision is PauseDecision.Pause) {
+                            val app = appRepository.getApp(targetPackage)
+                            val label = app?.label ?: targetPackage.substringAfterLast('.')
+                            overlayController.showOverlay(
+                                packageName = targetPackage,
+                                appLabel = label,
+                                config = pauseDecision.config,
+                                delaySeconds = pauseDecision.delaySeconds,
+                                isReintervention = false,
+                                onLeave = {
+                                    performGlobalAction(GLOBAL_ACTION_HOME)
+                                    serviceScope.launch {
+                                        pauseEngine.recordOutcome(
+                                            packageName = targetPackage,
+                                            kind = PauseEventKind.LAUNCH,
+                                            outcome = PauseOutcome.LEFT,
+                                            secondsShown = pauseDecision.delaySeconds
+                                        )
+                                    }
+                                },
+                                onContinue = { reason ->
+                                    pauseEngine.grantSession(targetPackage, pauseDecision.config.sessionMinutes)
+                                    serviceScope.launch {
+                                        pauseEngine.recordOutcome(
+                                            packageName = targetPackage,
+                                            kind = PauseEventKind.LAUNCH,
+                                            outcome = PauseOutcome.PROCEEDED,
+                                            reflectionReason = reason,
+                                            secondsShown = pauseDecision.delaySeconds
+                                        )
+                                    }
+                                    scheduleReintervention(targetPackage, pauseDecision.config)
+                                }
+                            )
+                        } else {
+                            // If grant is already valid, ensure re-intervention timer is active
+                            val storedConfig = pauseEngine.evaluate(targetPackage)
+                            if (storedConfig is PauseDecision.Pause) {
+                                scheduleReintervention(targetPackage, storedConfig.config)
+                            }
+                        }
                     }
                     is BypassDecision.InterceptAndRedirect -> {
                         stopMonitoring()
@@ -400,14 +487,71 @@ class MinimalAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun scheduleReintervention(packageName: String, config: PauseConfig) {
+        reinterventionJob?.cancel()
+        if (!config.reinterventionEnabled) return
+
+        val remainingMillis = pauseGrantStore.remainingMillis(packageName)
+        if (remainingMillis <= 0L) return
+
+        reinterventionJob = serviceScope.launch {
+            delay(remainingMillis)
+            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+            val isScreenOn = powerManager?.isInteractive ?: true
+            val isLocked = keyguardManager?.isKeyguardLocked ?: false
+            val isStillForeground = (currentForegroundPackage == packageName)
+
+            if (isStillForeground && isScreenOn && !isLocked) {
+                val app = appRepository.getApp(packageName)
+                val label = app?.label ?: packageName.substringAfterLast('.')
+                overlayController.showOverlay(
+                    packageName = packageName,
+                    appLabel = label,
+                    config = config,
+                    delaySeconds = config.pauseSeconds,
+                    isReintervention = true,
+                    onLeave = {
+                        performGlobalAction(GLOBAL_ACTION_HOME)
+                        serviceScope.launch {
+                            pauseEngine.recordOutcome(
+                                packageName = packageName,
+                                kind = PauseEventKind.REINTERVENTION,
+                                outcome = PauseOutcome.LEFT,
+                                secondsShown = config.pauseSeconds
+                            )
+                        }
+                    },
+                    onContinue = { reason ->
+                        pauseEngine.grantSession(packageName, config.sessionMinutes)
+                        serviceScope.launch {
+                            pauseEngine.recordOutcome(
+                                packageName = packageName,
+                                kind = PauseEventKind.REINTERVENTION,
+                                outcome = PauseOutcome.PROCEEDED,
+                                reflectionReason = reason,
+                                secondsShown = config.pauseSeconds
+                            )
+                        }
+                        scheduleReintervention(packageName, config)
+                    }
+                )
+            }
+        }
+    }
+
     override fun onInterrupt() {
         MinimalLog.w(TAG, "Accessibility service interrupted.")
         stopMonitoring()
+        overlayController.hideOverlay()
+        reinterventionJob?.cancel()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         stopMonitoring()
+        overlayController.hideOverlay()
+        reinterventionJob?.cancel()
         serviceScope.cancel()
         MinimalLog.i(TAG, "Minimal Phone Bypass Protection Service Destroyed.")
     }
