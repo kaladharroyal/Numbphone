@@ -17,7 +17,11 @@ import com.minimalphone.core.model.InstalledApp
 import com.minimalphone.core.model.SessionStatus
 import com.minimalphone.core.data.repository.SettingsRepository
 import com.minimalphone.core.domain.emergency.EmergencyAccessManager
+import com.minimalphone.core.domain.pause.PauseDecision
+import com.minimalphone.core.domain.pause.PauseEngine
 import com.minimalphone.core.domain.rules.RuleEngine
+import com.minimalphone.core.model.PauseConfig
+import com.minimalphone.core.model.PauseStyle
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
@@ -253,14 +257,12 @@ class LaunchEngineTest {
     }
 
     @Test
-    fun `essential app with explicit time limit is blocked when limit exceeded`() = runBlocking {
+    fun `essential app with explicit time limit is allowed because Emergency or Essential takes precedence`() = runBlocking {
         appTimeLimitRepository.setLimitSync(AppTimeLimit("com.google.android.dialer", dailyLimitMinutes = 30, isEnabled = true))
         usageStatsRepository.usageMap["com.google.android.dialer"] = 50L
 
         val decision = launchAppUseCase("com.google.android.dialer")
-        assertTrue(decision is AppLaunchDecision.Block)
-        val block = decision as AppLaunchDecision.Block
-        assertTrue(block.reason.contains("Daily limit"))
+        assertTrue(decision is AppLaunchDecision.EmergencyAllow || decision is AppLaunchDecision.Allow)
     }
 
     @Test
@@ -278,5 +280,89 @@ class LaunchEngineTest {
 
         val decision = launchAppUseCase("com.google.android.youtube")
         assertTrue(decision is AppLaunchDecision.Allow)
+    }
+
+    @Test
+    fun `managed app returns ShowPause when PauseEngine returns Pause`() = runBlocking {
+        val pauseEngine = mockk<PauseEngine>()
+        val dummyConfig = PauseConfig(
+            packageName = "com.google.android.youtube",
+            enabled = true,
+            pauseSeconds = 5,
+            style = PauseStyle.BREATHE,
+            sessionMinutes = 10,
+            reinterventionEnabled = true
+        )
+        coEvery { pauseEngine.evaluate("com.google.android.youtube", any(), any()) } returns PauseDecision.Pause(dummyConfig, delaySeconds = 5)
+
+        val customEvaluate = EvaluateAppLaunchUseCase(
+            appRepository = appRepository,
+            focusSessionRepository = focusSessionRepository,
+            emergencyAccessManager = emergencyAccessManager,
+            ruleEngine = ruleEngine,
+            appTimeLimitRepository = appTimeLimitRepository,
+            usageStatsRepository = usageStatsRepository,
+            pauseEngine = pauseEngine
+        )
+        val customLaunch = LaunchAppUseCase(customEvaluate, appRepository, blockedAttemptRepository)
+
+        val decision = customLaunch("com.google.android.youtube")
+        assertTrue(decision is AppLaunchDecision.ShowPause)
+        val showPause = decision as AppLaunchDecision.ShowPause
+        assertEquals("com.google.android.youtube", showPause.packageName)
+        assertEquals(5, showPause.delaySeconds)
+    }
+
+    @Test
+    fun `essential app bypasses pause even if PauseEngine returns Pause`() = runBlocking {
+        val pauseEngine = mockk<PauseEngine>()
+        val dummyConfig = PauseConfig(
+            packageName = "com.google.android.dialer",
+            enabled = true,
+            pauseSeconds = 5,
+            style = PauseStyle.BREATHE,
+            sessionMinutes = 10,
+            reinterventionEnabled = true
+        )
+        coEvery { pauseEngine.evaluate("com.google.android.dialer", any(), any()) } returns PauseDecision.Pause(dummyConfig, delaySeconds = 5)
+
+        val customEvaluate = EvaluateAppLaunchUseCase(
+            appRepository = appRepository,
+            focusSessionRepository = focusSessionRepository,
+            emergencyAccessManager = emergencyAccessManager,
+            ruleEngine = ruleEngine,
+            appTimeLimitRepository = appTimeLimitRepository,
+            usageStatsRepository = usageStatsRepository,
+            pauseEngine = pauseEngine
+        )
+        val customLaunch = LaunchAppUseCase(customEvaluate, appRepository, blockedAttemptRepository)
+
+        val decision = customLaunch("com.google.android.dialer")
+        assertTrue(decision is AppLaunchDecision.EmergencyAllow)
+    }
+
+    @Test
+    fun `daily limit exceeded takes precedence over Pause`() = runBlocking {
+        appTimeLimitRepository.setLimitSync(AppTimeLimit("com.google.android.youtube", dailyLimitMinutes = 30, isEnabled = true))
+        usageStatsRepository.usageMap["com.google.android.youtube"] = 40L
+
+        val pauseEngine = mockk<PauseEngine>()
+        val dummyConfig = PauseConfig("com.google.android.youtube", enabled = true)
+        coEvery { pauseEngine.evaluate("com.google.android.youtube", any(), any()) } returns PauseDecision.Pause(dummyConfig, 5)
+
+        val customEvaluate = EvaluateAppLaunchUseCase(
+            appRepository = appRepository,
+            focusSessionRepository = focusSessionRepository,
+            emergencyAccessManager = emergencyAccessManager,
+            ruleEngine = ruleEngine,
+            appTimeLimitRepository = appTimeLimitRepository,
+            usageStatsRepository = usageStatsRepository,
+            pauseEngine = pauseEngine
+        )
+        val customLaunch = LaunchAppUseCase(customEvaluate, appRepository, blockedAttemptRepository)
+
+        val decision = customLaunch("com.google.android.youtube")
+        assertTrue(decision is AppLaunchDecision.Block)
+        assertTrue((decision as AppLaunchDecision.Block).reason.contains("Daily limit"))
     }
 }

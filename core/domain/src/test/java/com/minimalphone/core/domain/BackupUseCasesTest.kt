@@ -198,6 +198,11 @@ class FakeSettingsRepositoryForBackup : SettingsRepository {
     override val settingsGuardMode: Flow<com.minimalphone.core.model.SettingsGuardMode> = MutableStateFlow(com.minimalphone.core.model.SettingsGuardMode.OFF)
     override val quarantineHours: Flow<com.minimalphone.core.model.QuarantineHours> = MutableStateFlow(com.minimalphone.core.model.QuarantineHours.TWENTY_FOUR)
     override val uninstallLockEnabled: Flow<Boolean> = MutableStateFlow(false)
+    override val pauseGlobalEnabled: Flow<Boolean> = MutableStateFlow(true)
+    override val defaultPauseSeconds: Flow<Int> = MutableStateFlow(5)
+    override val defaultSessionMinutes: Flow<Int> = MutableStateFlow(10)
+    override val defaultPauseStyle: Flow<com.minimalphone.core.model.PauseStyle> = MutableStateFlow(com.minimalphone.core.model.PauseStyle.BREATHE)
+    override val progressiveDelayEnabled: Flow<Boolean> = MutableStateFlow(false)
 
     override suspend fun setOnboardingCompleted(completed: Boolean) { onboardingFlow.value = completed }
     override suspend fun setAdaptiveFrictionEnabled(enabled: Boolean) { frictionFlow.value = enabled }
@@ -209,6 +214,11 @@ class FakeSettingsRepositoryForBackup : SettingsRepository {
     override suspend fun setSettingsGuardMode(mode: com.minimalphone.core.model.SettingsGuardMode) {}
     override suspend fun setQuarantineHours(hours: com.minimalphone.core.model.QuarantineHours) {}
     override suspend fun setUninstallLockEnabled(enabled: Boolean) {}
+    override suspend fun setPauseGlobalEnabled(enabled: Boolean) {}
+    override suspend fun setDefaultPauseSeconds(seconds: Int) {}
+    override suspend fun setDefaultSessionMinutes(minutes: Int) {}
+    override suspend fun setDefaultPauseStyle(style: com.minimalphone.core.model.PauseStyle) {}
+    override suspend fun setProgressiveDelayEnabled(enabled: Boolean) {}
 }
 
 class BackupUseCasesTest {

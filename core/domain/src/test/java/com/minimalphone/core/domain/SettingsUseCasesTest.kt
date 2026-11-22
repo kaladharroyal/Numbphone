@@ -23,6 +23,11 @@ class FakeSettingsRepository : SettingsRepository {
     val settingsGuardModeFlow = MutableStateFlow(com.minimalphone.core.model.SettingsGuardMode.OFF)
     val quarantineHoursFlow = MutableStateFlow(com.minimalphone.core.model.QuarantineHours.TWENTY_FOUR)
     val uninstallLockFlow = MutableStateFlow(false)
+    val pauseGlobalFlow = MutableStateFlow(true)
+    val defaultPauseSecondsFlow = MutableStateFlow(5)
+    val defaultSessionMinutesFlow = MutableStateFlow(10)
+    val defaultPauseStyleFlow = MutableStateFlow(com.minimalphone.core.model.PauseStyle.BREATHE)
+    val progressiveDelayFlow = MutableStateFlow(false)
 
     override val isOnboardingCompleted: Flow<Boolean> = onboardingFlow
     override val isAdaptiveFrictionEnabled: Flow<Boolean> = adaptiveFrictionFlow
@@ -34,6 +39,11 @@ class FakeSettingsRepository : SettingsRepository {
     override val settingsGuardMode: Flow<com.minimalphone.core.model.SettingsGuardMode> = settingsGuardModeFlow
     override val quarantineHours: Flow<com.minimalphone.core.model.QuarantineHours> = quarantineHoursFlow
     override val uninstallLockEnabled: Flow<Boolean> = uninstallLockFlow
+    override val pauseGlobalEnabled: Flow<Boolean> = pauseGlobalFlow
+    override val defaultPauseSeconds: Flow<Int> = defaultPauseSecondsFlow
+    override val defaultSessionMinutes: Flow<Int> = defaultSessionMinutesFlow
+    override val defaultPauseStyle: Flow<com.minimalphone.core.model.PauseStyle> = defaultPauseStyleFlow
+    override val progressiveDelayEnabled: Flow<Boolean> = progressiveDelayFlow
 
     override suspend fun setOnboardingCompleted(completed: Boolean) {
         onboardingFlow.value = completed
@@ -73,6 +83,26 @@ class FakeSettingsRepository : SettingsRepository {
 
     override suspend fun setUninstallLockEnabled(enabled: Boolean) {
         uninstallLockFlow.value = enabled
+    }
+
+    override suspend fun setPauseGlobalEnabled(enabled: Boolean) {
+        pauseGlobalFlow.value = enabled
+    }
+
+    override suspend fun setDefaultPauseSeconds(seconds: Int) {
+        defaultPauseSecondsFlow.value = seconds
+    }
+
+    override suspend fun setDefaultSessionMinutes(minutes: Int) {
+        defaultSessionMinutesFlow.value = minutes
+    }
+
+    override suspend fun setDefaultPauseStyle(style: com.minimalphone.core.model.PauseStyle) {
+        defaultPauseStyleFlow.value = style
+    }
+
+    override suspend fun setProgressiveDelayEnabled(enabled: Boolean) {
+        progressiveDelayFlow.value = enabled
     }
 }
 
