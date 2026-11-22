@@ -7,12 +7,15 @@ import com.minimalphone.core.data.repository.BlockedAttemptRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
 import com.minimalphone.core.data.repository.UsageStatsRepository
 import com.minimalphone.core.domain.emergency.EmergencyAccessManager
+import com.minimalphone.core.domain.pause.PauseDecision
+import com.minimalphone.core.domain.pause.PauseEngine
 import com.minimalphone.core.domain.quarantine.QuarantineEngine
 import com.minimalphone.core.domain.rules.RuleContext
 import com.minimalphone.core.domain.rules.RuleEngine
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.AppLaunchDecision
 import com.minimalphone.core.model.BlockedAttempt
+import com.minimalphone.core.model.FocusMode
 import javax.inject.Inject
 
 /**
@@ -34,7 +37,8 @@ class EvaluateAppLaunchUseCase @Inject constructor(
     private val appTimeLimitRepository: AppTimeLimitRepository,
     private val usageStatsRepository: UsageStatsRepository,
     private val appRuleRepository: AppRuleRepository? = null,
-    private val quarantineEngine: QuarantineEngine = QuarantineEngine()
+    private val quarantineEngine: QuarantineEngine = QuarantineEngine(),
+    private val pauseEngine: PauseEngine? = null
 ) {
     suspend operator fun invoke(packageName: String): AppLaunchDecision {
         // App must be in DB to be launched
@@ -45,7 +49,15 @@ class EvaluateAppLaunchUseCase @Inject constructor(
                 activeSession = null
             )
 
-        // 1. Check Per-App Daily Time Limits (Applies to all configured apps)
+        // 1. Emergency or Essential apps bypass ALL rules immediately (no pause)
+        if (emergencyAccessManager.isEmergencyOrEssential(packageName) || app.isEssential || app.category == AppCategory.ESSENTIAL) {
+            return AppLaunchDecision.EmergencyAllow(
+                packageName = packageName,
+                activityName = app.activityName
+            )
+        }
+
+        // 2. Daily limit exceeded (M14) -> block
         val timeLimit = appTimeLimitRepository.getLimit(packageName)
         if (timeLimit != null && timeLimit.isEnabled && timeLimit.effectiveDailyLimitMinutes > 0) {
             val usedMinutes = usageStatsRepository.getTodayUsageMinutes(packageName)
@@ -59,19 +71,29 @@ class EvaluateAppLaunchUseCase @Inject constructor(
             }
         }
 
-        // 2. Emergency / Essential apps bypass Focus Sessions, Quarantine, and Dumb Mode
-        if (emergencyAccessManager.isEmergencyOrEssential(packageName)) {
-            return AppLaunchDecision.EmergencyAllow(
-                packageName = packageName,
-                activityName = app.activityName
-            )
+        // 3. Focus block (M6) -> block
+        val activeSession = focusSessionRepository.getActiveSessionSync()
+        if (activeSession != null && activeSession.isCurrentlyActive) {
+            if (activeSession.mode == FocusMode.STRICT || activeSession.mode == FocusMode.DEEP_FOCUS) {
+                return AppLaunchDecision.Block(
+                    packageName = app.packageName,
+                    reason = "This app is restricted during your '${activeSession.goal.title}' focus session.",
+                    activeSession = activeSession
+                )
+            }
+            if (activeSession.mode == FocusMode.LIGHT) {
+                return AppLaunchDecision.ShowFriction(
+                    packageName = app.packageName,
+                    activeSession = activeSession,
+                    frictionSeconds = 5
+                )
+            }
         }
 
-        // 3. Quarantine check (M21): Block newly installed managed apps during quarantine
+        // 4. Quarantine (M21) -> block
         val quarantineUntil = appRuleRepository?.getQuarantineUntil(packageName)
         if (quarantineEngine.isQuarantined(quarantineUntil, System.currentTimeMillis())) {
             val remaining = quarantineEngine.remainingHours(quarantineUntil, System.currentTimeMillis())
-            val activeSession = focusSessionRepository.getActiveSessionSync()
             return AppLaunchDecision.Block(
                 packageName = packageName,
                 reason = "App is currently in quarantine (Available in $remaining).",
@@ -79,8 +101,18 @@ class EvaluateAppLaunchUseCase @Inject constructor(
             )
         }
 
-        // 4. Delegate to RuleEngine (focus, budget M14, schedule M15, dumb mode M16…)
-        val activeSession = focusSessionRepository.getActiveSessionSync()
+        // 5. Pause required (M22) -> AppLaunchDecision.ShowPause(config, delaySeconds)
+        val pauseDecision = pauseEngine?.evaluate(packageName) ?: PauseDecision.NoPause
+        if (pauseDecision is PauseDecision.Pause) {
+            return AppLaunchDecision.ShowPause(
+                packageName = app.packageName,
+                activityName = app.activityName,
+                config = pauseDecision.config,
+                delaySeconds = pauseDecision.delaySeconds
+            )
+        }
+
+        // 6. Otherwise -> allow (delegate to RuleEngine for budget / dumb mode policies)
         val context = RuleContext(
             app = app,
             activeSession = activeSession

@@ -2,8 +2,10 @@ package com.minimalphone.core.domain.insights
 
 import com.minimalphone.core.data.repository.BlockedAttemptRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
+import com.minimalphone.core.data.repository.PauseRepository
 import com.minimalphone.core.data.repository.UsageStatsRepository
 import com.minimalphone.core.model.BehavioralInsights
+import com.minimalphone.core.model.PauseOutcome
 import com.minimalphone.core.model.SessionStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -14,7 +16,8 @@ import javax.inject.Inject
 class GetBehavioralInsightsUseCase @Inject constructor(
     private val blockedAttemptRepository: BlockedAttemptRepository,
     private val focusSessionRepository: FocusSessionRepository,
-    private val usageStatsRepository: UsageStatsRepository
+    private val usageStatsRepository: UsageStatsRepository,
+    private val pauseRepository: PauseRepository? = null
 ) {
     operator fun invoke(): Flow<BehavioralInsights> {
         val todayStartMillis = LocalDate.now()
@@ -42,13 +45,21 @@ class GetBehavioralInsightsUseCase @Inject constructor(
             val totalFocusMins = todaySessions.sumOf { it.durationMinutes }
             val totalReflections = todayBlocks.count { !it.userIntentReason.isNullOrBlank() }
 
+            val todayPauseEvents = pauseRepository?.getEventsSince(todayStartMillis) ?: emptyList()
+            val totalPauses = todayPauseEvents.size
+            val walkedAway = todayPauseEvents.count { it.outcome == PauseOutcome.LEFT }
+            val walkAwayRate = if (totalPauses > 0) ((walkedAway * 100) / totalPauses) else 0
+
             BehavioralInsights(
                 totalBlockedAttemptsToday = todayBlocks.size,
                 topBlockedApps = topBlocked,
                 totalFocusMinutesToday = totalFocusMins,
                 focusSessionCountToday = todaySessions.size,
                 totalReflectionsCountToday = totalReflections,
-                dailyProgressVsAverage = if (todayBlocks.size > 0) 15 else 0
+                dailyProgressVsAverage = if (todayBlocks.size > 0) 15 else 0,
+                totalPausesShownToday = totalPauses,
+                pausesWalkedAwayToday = walkedAway,
+                walkAwayRatePercentToday = walkAwayRate
             )
         }
     }

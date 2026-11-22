@@ -2,7 +2,9 @@ package com.minimalphone.core.domain.insights
 
 import com.minimalphone.core.data.repository.BlockedAttemptRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
+import com.minimalphone.core.data.repository.PauseRepository
 import com.minimalphone.core.data.repository.UsageStatsRepository
+import com.minimalphone.core.model.PauseOutcome
 import com.minimalphone.core.model.SessionStatus
 import com.minimalphone.core.model.WeeklyWellbeingReport
 import kotlinx.coroutines.flow.Flow
@@ -15,7 +17,8 @@ import javax.inject.Inject
 class GetWeeklyWellbeingReportUseCase @Inject constructor(
     private val blockedAttemptRepository: BlockedAttemptRepository,
     private val focusSessionRepository: FocusSessionRepository,
-    private val usageStatsRepository: UsageStatsRepository
+    private val usageStatsRepository: UsageStatsRepository,
+    private val pauseRepository: PauseRepository? = null
 ) {
     operator fun invoke(): Flow<WeeklyWellbeingReport> {
         val today = LocalDate.now()
@@ -49,6 +52,11 @@ class GetWeeklyWellbeingReportUseCase @Inject constructor(
                 else -> "Try scheduling short 25m focus blocks during your high-distraction hours."
             }
 
+            val weeklyPauseEvents = pauseRepository?.getEventsSince(weekAgoMillis) ?: emptyList()
+            val weeklyPauses = weeklyPauseEvents.size
+            val weeklyWalkedAway = weeklyPauseEvents.count { it.outcome == PauseOutcome.LEFT }
+            val weeklyRate = if (weeklyPauses > 0) ((weeklyWalkedAway * 100) / weeklyPauses) else 0
+
             WeeklyWellbeingReport(
                 startDate = weekAgo.format(dateFormatter),
                 endDate = today.format(dateFormatter),
@@ -57,7 +65,10 @@ class GetWeeklyWellbeingReportUseCase @Inject constructor(
                 totalFocusHours = String.format("%.1f", totalFocusHours).toFloatOrNull() ?: 0f,
                 totalDistractionsBlocked = weeklyBlocks.size,
                 digitalBalanceScore = balanceScore,
-                keyTakeaway = takeaway
+                keyTakeaway = takeaway,
+                weeklyPausesShown = weeklyPauses,
+                weeklyPausesWalkedAway = weeklyWalkedAway,
+                weeklyWalkAwayRatePercent = weeklyRate
             )
         }
     }

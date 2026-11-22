@@ -5,6 +5,7 @@ import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.ContactRepository
 import com.minimalphone.core.data.repository.EssentialAppRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
+import com.minimalphone.core.data.repository.PauseRepository
 import com.minimalphone.core.data.repository.ScheduleRepository
 import com.minimalphone.core.data.repository.SettingsRepository
 import com.minimalphone.core.model.AppCategory
@@ -13,6 +14,8 @@ import com.minimalphone.core.model.FocusGoal
 import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSchedule
 import com.minimalphone.core.model.FocusSession
+import com.minimalphone.core.model.PauseConfig
+import com.minimalphone.core.model.PauseStyle
 import com.minimalphone.core.model.SessionStatus
 import kotlinx.coroutines.flow.first
 import org.json.JSONArray
@@ -43,7 +46,8 @@ class ExportBackupJsonUseCase @Inject constructor(
     private val appTimeLimitRepository: AppTimeLimitRepository,
     private val scheduleRepository: ScheduleRepository,
     private val essentialAppRepository: EssentialAppRepository,
-    private val contactRepository: ContactRepository
+    private val contactRepository: ContactRepository,
+    private val pauseRepository: PauseRepository? = null
 ) {
     suspend operator fun invoke(): BackupExportResult {
         val apps = appRepository.getAllApps().first()
@@ -55,13 +59,20 @@ class ExportBackupJsonUseCase @Inject constructor(
         val theme = settingsRepository.appTheme.first()
         val dumbMode = settingsRepository.isDumbModeEnabled.first()
 
+        val pauseGlobal = runCatching { settingsRepository.pauseGlobalEnabled.first() }.getOrDefault(true)
+        val defaultPauseSec = runCatching { settingsRepository.defaultPauseSeconds.first() }.getOrDefault(5)
+        val defaultSessionMin = runCatching { settingsRepository.defaultSessionMinutes.first() }.getOrDefault(10)
+        val defaultStyle = runCatching { settingsRepository.defaultPauseStyle.first() }.getOrDefault(PauseStyle.BREATHE)
+        val progressiveDelay = runCatching { settingsRepository.progressiveDelayEnabled.first() }.getOrDefault(false)
+
         val timeLimits = appTimeLimitRepository.observeAllLimits().first()
         val schedules = scheduleRepository.observeSchedules().first()
         val essentials = essentialAppRepository.observeEssentialApps().first()
         val contacts = contactRepository.observeAllContacts().first()
+        val pauseConfigs = pauseRepository?.observeAllConfigs()?.first() ?: emptyList()
 
         val root = JSONObject()
-        root.put("version", 2)
+        root.put("version", 3)
         root.put("timestamp", System.currentTimeMillis())
 
         val settingsObj = JSONObject()
@@ -71,6 +82,11 @@ class ExportBackupJsonUseCase @Inject constructor(
         settingsObj.put("isLocalAnalyticsEnabled", analytics)
         settingsObj.put("appTheme", theme.name)
         settingsObj.put("isDumbModeEnabled", dumbMode)
+        settingsObj.put("pauseGlobalEnabled", pauseGlobal)
+        settingsObj.put("defaultPauseSeconds", defaultPauseSec)
+        settingsObj.put("defaultSessionMinutes", defaultSessionMin)
+        settingsObj.put("defaultPauseStyle", defaultStyle.name)
+        settingsObj.put("progressiveDelayEnabled", progressiveDelay)
         root.put("settings", settingsObj)
 
         val appsArray = JSONArray()
@@ -149,6 +165,20 @@ class ExportBackupJsonUseCase @Inject constructor(
         }
         root.put("quickContacts", contactsArray)
 
+        // Pause Configs (M22)
+        val pauseArray = JSONArray()
+        pauseConfigs.forEach { pc ->
+            val pcObj = JSONObject()
+            pcObj.put("packageName", pc.packageName)
+            pcObj.put("enabled", pc.enabled)
+            pcObj.put("pauseSeconds", pc.pauseSeconds)
+            pcObj.put("style", pc.style.name)
+            pcObj.put("sessionMinutes", pc.sessionMinutes)
+            pcObj.put("reinterventionEnabled", pc.reinterventionEnabled)
+            pauseArray.put(pcObj)
+        }
+        root.put("pauseConfigs", pauseArray)
+
         val jsonString = root.toString(2)
         return BackupExportResult(
             jsonString = jsonString,
@@ -166,7 +196,8 @@ class ImportBackupJsonUseCase @Inject constructor(
     private val appTimeLimitRepository: AppTimeLimitRepository,
     private val scheduleRepository: ScheduleRepository,
     private val essentialAppRepository: EssentialAppRepository,
-    private val contactRepository: ContactRepository
+    private val contactRepository: ContactRepository,
+    private val pauseRepository: PauseRepository? = null
 ) {
     suspend operator fun invoke(jsonString: String): BackupImportResult {
         return try {
@@ -195,6 +226,21 @@ class ImportBackupJsonUseCase @Inject constructor(
             }
             if (settingsObj.has("isDumbModeEnabled")) {
                 settingsRepository.setDumbModeEnabled(settingsObj.getBoolean("isDumbModeEnabled"))
+            }
+            if (settingsObj.has("pauseGlobalEnabled")) {
+                settingsRepository.setPauseGlobalEnabled(settingsObj.getBoolean("pauseGlobalEnabled"))
+            }
+            if (settingsObj.has("defaultPauseSeconds")) {
+                settingsRepository.setDefaultPauseSeconds(settingsObj.getInt("defaultPauseSeconds"))
+            }
+            if (settingsObj.has("defaultSessionMinutes")) {
+                settingsRepository.setDefaultSessionMinutes(settingsObj.getInt("defaultSessionMinutes"))
+            }
+            if (settingsObj.has("defaultPauseStyle")) {
+                settingsRepository.setDefaultPauseStyle(PauseStyle.fromName(settingsObj.getString("defaultPauseStyle")))
+            }
+            if (settingsObj.has("progressiveDelayEnabled")) {
+                settingsRepository.setProgressiveDelayEnabled(settingsObj.getBoolean("progressiveDelayEnabled"))
             }
 
             // 2. Restore App Classifications & Favorites
@@ -330,6 +376,30 @@ class ImportBackupJsonUseCase @Inject constructor(
                     val phone = cObj.getString("phoneNumber")
                     val isPinned = cObj.optBoolean("isPinned", true)
                     contactRepository.saveContact(name, phone, isPinned)
+                }
+            }
+
+            // 7. Restore Pause Configs (M22)
+            if (root.has("pauseConfigs") && pauseRepository != null) {
+                val pauseArray = root.getJSONArray("pauseConfigs")
+                for (i in 0 until pauseArray.length()) {
+                    val pcObj = pauseArray.getJSONObject(i)
+                    val pkg = pcObj.getString("packageName")
+                    val enabled = pcObj.optBoolean("enabled", true)
+                    val pauseSec = pcObj.optInt("pauseSeconds", 5)
+                    val style = PauseStyle.fromName(pcObj.optString("style", PauseStyle.BREATHE.name))
+                    val sessionMin = pcObj.optInt("sessionMinutes", 10)
+                    val reint = pcObj.optBoolean("reinterventionEnabled", true)
+                    pauseRepository.saveAppPauseConfig(
+                        PauseConfig(
+                            packageName = pkg,
+                            enabled = enabled,
+                            pauseSeconds = pauseSec,
+                            style = style,
+                            sessionMinutes = sessionMin,
+                            reinterventionEnabled = reint
+                        )
+                    )
                 }
             }
 
