@@ -2,24 +2,23 @@ package com.minimalphone.feature.homescreen
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.minimalphone.core.data.repository.AppRepository
+import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.ContactRepository
 import com.minimalphone.core.data.repository.EssentialAppRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
 import com.minimalphone.core.data.repository.NotificationDigestRepository
-import com.minimalphone.core.domain.ExtendAppTimeLimitUseCase
-import com.minimalphone.core.domain.GetHomeAppsUseCase
-import com.minimalphone.core.domain.SyncInstalledAppsUseCase
-import com.minimalphone.core.domain.dumbmode.DumbModeManager
+import com.minimalphone.core.data.repository.SettingsRepository
 import com.minimalphone.core.domain.dumbmode.LauncherPolicy
 import com.minimalphone.core.domain.friction.RecordIntentReflectionUseCase
 import com.minimalphone.core.domain.launch.LaunchAppUseCase
+import com.minimalphone.core.domain.timelimit.TimeLimitExpiryNotifier
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.AppLaunchDecision
 import com.minimalphone.core.model.FocusMode
 import com.minimalphone.core.model.FocusSession
 import com.minimalphone.core.model.InstalledApp
 import com.minimalphone.core.model.QuickContact
-import com.minimalphone.core.domain.timelimit.TimeLimitExpiryNotifier
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -67,17 +66,16 @@ data class HomeUiState(
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val getHomeAppsUseCase: GetHomeAppsUseCase,
-    private val syncInstalledAppsUseCase: SyncInstalledAppsUseCase,
+    private val appRepository: AppRepository,
     private val launchAppUseCase: LaunchAppUseCase,
     private val focusSessionRepository: FocusSessionRepository,
     private val recordIntentReflectionUseCase: RecordIntentReflectionUseCase,
-    private val dumbModeManager: DumbModeManager,
+    private val settingsRepository: SettingsRepository,
     private val launcherPolicy: LauncherPolicy,
     private val essentialAppRepository: EssentialAppRepository,
     private val contactRepository: ContactRepository,
     private val digestRepository: NotificationDigestRepository,
-    private val extendAppTimeLimitUseCase: ExtendAppTimeLimitUseCase,
+    private val appTimeLimitRepository: AppTimeLimitRepository,
     private val timeLimitExpiryNotifier: TimeLimitExpiryNotifier
 ) : ViewModel() {
 
@@ -125,9 +123,9 @@ class HomeViewModel @Inject constructor(
     private fun observeState() {
         viewModelScope.launch {
             combine(
-                getHomeAppsUseCase(),
+                appRepository.getHomeApps(),
                 focusSessionRepository.getActiveSession(),
-                dumbModeManager.isDumbModeEnabled,
+                settingsRepository.isDumbModeEnabled,
                 essentialAppRepository.observeEssentialPackages()
             ) { apps, session, isDumbMode, essentialPkgs ->
                 val isActive = session != null && session.isCurrentlyActive
@@ -226,7 +224,9 @@ class HomeViewModel @Inject constructor(
 
     fun extendEmergencyTime(packageName: String, additionalMinutes: Int) {
         viewModelScope.launch {
-            extendAppTimeLimitUseCase(packageName, additionalMinutes)
+            if (additionalMinutes > 0) {
+                appTimeLimitRepository.addEmergencyExtension(packageName, additionalMinutes)
+            }
             timeLimitExpiryNotifier.clearExpiredEvent()
             _uiState.value = _uiState.value.copy(
                 timeLimitExpiredDialog = TimeLimitExpiredDialogState(isShowing = false)
@@ -280,7 +280,7 @@ class HomeViewModel @Inject constructor(
 
     fun refreshApps() {
         viewModelScope.launch {
-            syncInstalledAppsUseCase()
+            appRepository.syncInstalledApps()
         }
     }
 }

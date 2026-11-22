@@ -3,10 +3,8 @@ package com.minimalphone.feature.appslist
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.minimalphone.core.data.repository.AppRepository
+import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.UsageStatsRepository
-import com.minimalphone.core.domain.GetAppTimeLimitsUseCase
-import com.minimalphone.core.domain.RemoveAppTimeLimitUseCase
-import com.minimalphone.core.domain.SetAppTimeLimitUseCase
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.AppTimeLimit
 import com.minimalphone.core.model.InstalledApp
@@ -41,9 +39,7 @@ data class AppsManagementUiState(
 @HiltViewModel
 class AppsManagementViewModel @Inject constructor(
     private val appRepository: AppRepository,
-    private val getAppTimeLimitsUseCase: GetAppTimeLimitsUseCase,
-    private val setAppTimeLimitUseCase: SetAppTimeLimitUseCase,
-    private val removeAppTimeLimitUseCase: RemoveAppTimeLimitUseCase,
+    private val appTimeLimitRepository: AppTimeLimitRepository,
     private val usageStatsRepository: UsageStatsRepository
 ) : ViewModel() {
 
@@ -54,7 +50,7 @@ class AppsManagementViewModel @Inject constructor(
         appRepository.getAllApps(),
         _searchQuery,
         _activeFilter,
-        getAppTimeLimitsUseCase(),
+        appTimeLimitRepository.observeAllLimits(),
         usageStatsRepository.getDailyUsageSummary()
     ) { allApps, query, filter, limits, usageSummary ->
         val filtered = allApps.filter { app ->
@@ -119,13 +115,13 @@ class AppsManagementViewModel @Inject constructor(
 
     fun setAppTimeLimit(packageName: String, limitMinutes: Int) {
         viewModelScope.launch {
-            setAppTimeLimitUseCase(packageName, limitMinutes)
+            appTimeLimitRepository.setLimit(packageName, limitMinutes)
         }
     }
 
     fun removeAppTimeLimit(packageName: String) {
         viewModelScope.launch {
-            removeAppTimeLimitUseCase(packageName)
+            appTimeLimitRepository.removeLimit(packageName)
         }
     }
 

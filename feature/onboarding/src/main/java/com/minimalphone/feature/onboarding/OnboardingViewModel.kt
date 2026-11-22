@@ -7,10 +7,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.minimalphone.core.common.AccessibilityHelper
 import com.minimalphone.core.common.SystemHealthHelper
-import com.minimalphone.core.domain.CheckUsagePermissionUseCase
-import com.minimalphone.core.domain.GetInstalledAppsUseCase
-import com.minimalphone.core.domain.SetOnboardingCompletedUseCase
-import com.minimalphone.core.domain.SyncInstalledAppsUseCase
+import com.minimalphone.core.data.repository.AppRepository
+import com.minimalphone.core.data.repository.SettingsRepository
+import com.minimalphone.core.data.repository.UsageStatsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,10 +39,9 @@ data class OnboardingUiState(
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val setOnboardingCompletedUseCase: SetOnboardingCompletedUseCase,
-    private val syncInstalledAppsUseCase: SyncInstalledAppsUseCase,
-    private val getInstalledAppsUseCase: GetInstalledAppsUseCase,
-    private val checkUsagePermissionUseCase: CheckUsagePermissionUseCase
+    private val settingsRepository: SettingsRepository,
+    private val appRepository: AppRepository,
+    private val usageStatsRepository: UsageStatsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OnboardingUiState())
@@ -58,7 +56,7 @@ class OnboardingViewModel @Inject constructor(
         viewModelScope.launch {
             val isLauncher = SystemHealthHelper.isDefaultLauncher(context)
             val isAccess = isAccessibilityEnabledInternal()
-            val isUsage = checkUsagePermissionUseCase()
+            val isUsage = usageStatsRepository.hasUsagePermission()
 
             _uiState.value = _uiState.value.copy(
                 isDefaultLauncher = isLauncher,
@@ -70,7 +68,7 @@ class OnboardingViewModel @Inject constructor(
 
     private fun observeDiscoveredApps() {
         viewModelScope.launch {
-            getInstalledAppsUseCase().collect { apps ->
+            appRepository.getAllApps().collect { apps ->
                 val essential = apps.count { it.isEssential }
                 val managed = apps.count { !it.isEssential }
                 _uiState.value = _uiState.value.copy(
@@ -110,7 +108,7 @@ class OnboardingViewModel @Inject constructor(
     private fun scanApps() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isScanning = true)
-            syncInstalledAppsUseCase()
+            appRepository.syncInstalledApps()
             _uiState.value = _uiState.value.copy(isScanning = false)
         }
     }
@@ -133,7 +131,7 @@ class OnboardingViewModel @Inject constructor(
 
     fun completeOnboarding(onFinished: () -> Unit) {
         viewModelScope.launch {
-            setOnboardingCompletedUseCase(true)
+            settingsRepository.setOnboardingCompleted(true)
             onFinished()
         }
     }

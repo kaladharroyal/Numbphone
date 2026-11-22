@@ -3,9 +3,6 @@ package com.minimalphone.feature.appslist
 import com.minimalphone.core.data.repository.AppRepository
 import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.UsageStatsRepository
-import com.minimalphone.core.domain.GetAppTimeLimitsUseCase
-import com.minimalphone.core.domain.RemoveAppTimeLimitUseCase
-import com.minimalphone.core.domain.SetAppTimeLimitUseCase
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.AppTimeLimit
 import com.minimalphone.core.model.DailyUsageSummary
@@ -98,9 +95,7 @@ class AppsManagementViewModelTest {
         val usageRepo = FakeManagementUsageStatsRepo()
         return AppsManagementViewModel(
             appRepository = repo,
-            getAppTimeLimitsUseCase = GetAppTimeLimitsUseCase(limitRepo),
-            setAppTimeLimitUseCase = SetAppTimeLimitUseCase(limitRepo),
-            removeAppTimeLimitUseCase = RemoveAppTimeLimitUseCase(limitRepo),
+            appTimeLimitRepository = limitRepo,
             usageStatsRepository = usageRepo
         )
     }

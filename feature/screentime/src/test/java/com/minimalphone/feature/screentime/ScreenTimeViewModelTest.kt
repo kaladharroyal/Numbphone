@@ -4,10 +4,6 @@ import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.BlockedAttemptRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
 import com.minimalphone.core.data.repository.UsageStatsRepository
-import com.minimalphone.core.domain.GetAppTimeLimitsUseCase
-import com.minimalphone.core.domain.GetDailyUsageStatsUseCase
-import com.minimalphone.core.domain.RemoveAppTimeLimitUseCase
-import com.minimalphone.core.domain.SetAppTimeLimitUseCase
 import com.minimalphone.core.domain.insights.GetBehavioralInsightsUseCase
 import com.minimalphone.core.domain.insights.GetWeeklyWellbeingReportUseCase
 import com.minimalphone.core.model.AppCategory
@@ -97,20 +93,14 @@ class ScreenTimeViewModelTest {
         val fakeFocus = FakeFocusSessionRepo()
         val fakeLimitRepo = FakeTimeLimitRepo()
 
-        val usageUseCase = GetDailyUsageStatsUseCase(fakeRepo)
         val insightsUseCase = GetBehavioralInsightsUseCase(fakeBlocked, fakeFocus, fakeRepo)
         val reportUseCase = GetWeeklyWellbeingReportUseCase(fakeBlocked, fakeFocus, fakeRepo)
-        val getLimitsUseCase = GetAppTimeLimitsUseCase(fakeLimitRepo)
-        val setLimitUseCase = SetAppTimeLimitUseCase(fakeLimitRepo)
-        val removeLimitUseCase = RemoveAppTimeLimitUseCase(fakeLimitRepo)
 
         val viewModel = ScreenTimeViewModel(
-            usageUseCase,
-            insightsUseCase,
-            reportUseCase,
-            getLimitsUseCase,
-            setLimitUseCase,
-            removeLimitUseCase
+            usageStatsRepository = fakeRepo,
+            appTimeLimitRepository = fakeLimitRepo,
+            getBehavioralInsightsUseCase = insightsUseCase,
+            getWeeklyWellbeingReportUseCase = reportUseCase
         )
 
         val state = viewModel.uiState.value

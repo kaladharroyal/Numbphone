@@ -7,11 +7,8 @@ import com.minimalphone.core.data.repository.ContactRepository
 import com.minimalphone.core.data.repository.EssentialAppRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
 import com.minimalphone.core.data.repository.NotificationDigestRepository
+import com.minimalphone.core.data.repository.SettingsRepository
 import com.minimalphone.core.data.repository.UsageStatsRepository
-import com.minimalphone.core.domain.ExtendAppTimeLimitUseCase
-import com.minimalphone.core.domain.GetHomeAppsUseCase
-import com.minimalphone.core.domain.SyncInstalledAppsUseCase
-import com.minimalphone.core.domain.dumbmode.DumbModeManager
 import com.minimalphone.core.domain.dumbmode.LauncherPolicy
 import com.minimalphone.core.domain.emergency.EmergencyAccessManager
 import com.minimalphone.core.domain.friction.RecordIntentReflectionUseCase
@@ -149,8 +146,6 @@ class HomeViewModelTest {
         ruleEngine: RuleEngine = mockk(relaxed = true),
         timeLimitExpiryNotifier: TimeLimitExpiryNotifier = TimeLimitExpiryNotifier()
     ): HomeViewModel {
-        val getHomeAppsUseCase = GetHomeAppsUseCase(fakeRepo)
-        val syncInstalledAppsUseCase = SyncInstalledAppsUseCase(fakeRepo)
         val emergencyAccessManager = mockk<EmergencyAccessManager>(relaxed = true)
         coEvery { emergencyAccessManager.isEmergencyOrEssential("com.google.android.dialer") } returns true
 
@@ -165,8 +160,8 @@ class HomeViewModelTest {
         val launchAppUseCase = LaunchAppUseCase(evaluateAppLaunchUseCase, fakeRepo, fakeBlockedRepo)
         val recordIntentReflectionUseCase = RecordIntentReflectionUseCase(fakeBlockedRepo)
 
-        val dumbModeManager = mockk<DumbModeManager>(relaxed = true)
-        every { dumbModeManager.isDumbModeEnabled } returns MutableStateFlow(false)
+        val settingsRepository = mockk<SettingsRepository>(relaxed = true)
+        every { settingsRepository.isDumbModeEnabled } returns MutableStateFlow(false)
 
         val launcherPolicy = LauncherPolicy()
         val essentialAppRepository = mockk<EssentialAppRepository>(relaxed = true)
@@ -178,20 +173,17 @@ class HomeViewModelTest {
         val digestRepository = mockk<NotificationDigestRepository>(relaxed = true)
         every { digestRepository.observeUnreadCount() } returns MutableStateFlow(0)
 
-        val extendAppTimeLimitUseCase = ExtendAppTimeLimitUseCase(fakeTimeLimitRepo)
-
         return HomeViewModel(
-            getHomeAppsUseCase = getHomeAppsUseCase,
-            syncInstalledAppsUseCase = syncInstalledAppsUseCase,
+            appRepository = fakeRepo,
             launchAppUseCase = launchAppUseCase,
             focusSessionRepository = fakeSessionRepo,
             recordIntentReflectionUseCase = recordIntentReflectionUseCase,
-            dumbModeManager = dumbModeManager,
+            settingsRepository = settingsRepository,
             launcherPolicy = launcherPolicy,
             essentialAppRepository = essentialAppRepository,
             contactRepository = contactRepository,
             digestRepository = digestRepository,
-            extendAppTimeLimitUseCase = extendAppTimeLimitUseCase,
+            appTimeLimitRepository = fakeTimeLimitRepo,
             timeLimitExpiryNotifier = timeLimitExpiryNotifier
         )
     }
