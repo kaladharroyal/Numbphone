@@ -1,6 +1,7 @@
 package com.minimalphone.core.domain.taxonomy
 
 import com.minimalphone.core.model.AppTaxonomy
+import com.minimalphone.core.model.ClassificationSource
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -41,5 +42,28 @@ class AppTaxonomyClassifier @Inject constructor() {
         val lowerLabel = label.lowercase()
         val essentialLabels = setOf("phone", "messages", "settings", "camera", "clock", "dialer")
         return lowerLabel in essentialLabels || lowerPkg.contains("dialer") || lowerPkg.contains("telecom")
+    }
+
+    fun isWebApk(packageName: String): Boolean {
+        val lower = packageName.lowercase()
+        return lower.startsWith("org.chromium.webapk.") ||
+               lower.startsWith("org.chromium.") ||
+               lower.endsWith(".webapk")
+    }
+
+    fun isCloneIndicator(packageName: String): Boolean {
+        val lower = packageName.lowercase()
+        return lower.contains(".clone.") || lower.contains(".work.") ||
+               lower.contains(".dual.") || lower.contains(".second.") ||
+               lower.contains(".parallel.") ||
+               lower.endsWith(".clone") || lower.endsWith(".work")
+    }
+
+    fun classifySource(packageName: String): ClassificationSource {
+        return if (isWebApk(packageName)) {
+            ClassificationSource.WEB_APP
+        } else {
+            ClassificationSource.AUTOMATIC_DEFAULT
+        }
     }
 }

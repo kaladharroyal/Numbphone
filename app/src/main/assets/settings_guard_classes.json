@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "blockedClasses": [
+    "AccessibilitySettings",
+    "AccessibilitySettingsForSetupWizard",
+    "InstalledAppDetails",
+    "AppInfoDashboardFragment",
+    "DeviceAdminAdd",
+    "DefaultAppSettings",
+    "SpecialAccessSettings",
+    "ManageApplications",
+    "PackageInstallerActivity",
+    "UninstallerActivity",
+    "AppPermissionsFragment",
+    "ManagePermissionsActivity"
+  ],
+  "allowedClasses": [
+    "WifiSettings",
+    "NetworkDashboardFragment",
+    "BluetoothSettings",
+    "DisplaySettings",
+    "BatterySettings",
+    "SoundSettings",
+    "LanguageSettings",
+    "DateTimeSettings",
+    "ZenModeSettings"
+  ],
+  "settingsPackages": [
+    "com.android.settings",
+    "com.samsung.android.settings",
+    "com.miui.settings",
+    "com.oppo.settings",
+    "com.oneplus.settings",
+    "com.huawei.systemmanager",
+    "com.android.packageinstaller",
+    "com.google.android.packageinstaller"
+  ]
+}

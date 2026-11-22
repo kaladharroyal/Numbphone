@@ -51,7 +51,10 @@ data class SystemDiagnosticsData(
     val oemName: String = "",
     val deviceModel: String = "",
     val androidVersion: Int = 0,
-    val oemGuidance: String? = null
+    val oemGuidance: String? = null,
+    val isSettingsGuardReady: Boolean = false,
+    val isUninstallLockActive: Boolean = false,
+    val unreviewedQuarantinedAppsCount: Int = 0
 )
 
 class ObserveSystemDiagnosticsUseCase @Inject constructor(
@@ -66,7 +69,10 @@ class ObserveSystemDiagnosticsUseCase @Inject constructor(
         oemName: String,
         deviceModel: String,
         androidVersion: Int,
-        oemGuidance: String?
+        oemGuidance: String?,
+        isSettingsGuardReady: Boolean = false,
+        isUninstallLockActive: Boolean = false,
+        unreviewedQuarantinedAppsCount: Int = 0
     ): Flow<SystemDiagnosticsData> {
         return combine(
             focusSessionRepository.getActiveSession(),
@@ -82,7 +88,10 @@ class ObserveSystemDiagnosticsUseCase @Inject constructor(
                 oemName = oemName,
                 deviceModel = deviceModel,
                 androidVersion = androidVersion,
-                oemGuidance = oemGuidance
+                oemGuidance = oemGuidance,
+                isSettingsGuardReady = isSettingsGuardReady,
+                isUninstallLockActive = isUninstallLockActive,
+                unreviewedQuarantinedAppsCount = unreviewedQuarantinedAppsCount
             )
         }
     }

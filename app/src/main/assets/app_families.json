@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "families": [
+    {
+      "familyId": "instagram",
+      "packages": [
+        "com.instagram.android",
+        "com.instagram.lite",
+        "com.instagram.barcelona"
+      ]
+    },
+    {
+      "familyId": "facebook",
+      "packages": [
+        "com.facebook.katana",
+        "com.facebook.lite",
+        "com.facebook.orca"
+      ]
+    },
+    {
+      "familyId": "twitter_x",
+      "packages": [
+        "com.twitter.android",
+        "com.twitter.android.lite"
+      ]
+    },
+    {
+      "familyId": "tiktok",
+      "packages": [
+        "com.zhiliaoapp.musically",
+        "com.ss.android.ugc.trill",
+        "com.ss.android.ugc.aweme"
+      ]
+    },
+    {
+      "familyId": "youtube",
+      "packages": [
+        "com.google.android.youtube",
+        "com.google.android.apps.youtube.music"
+      ]
+    },
+    {
+      "familyId": "snapchat",
+      "packages": [
+        "com.snapchat.android"
+      ]
+    },
+    {
+      "familyId": "reddit",
+      "packages": [
+        "com.reddit.frontpage",
+        "com.reddit.android"
+      ]
+    }
+  ]
+}

@@ -1,11 +1,13 @@
 package com.minimalphone.core.domain.bypass
 
 import com.minimalphone.core.data.repository.AppRepository
+import com.minimalphone.core.data.repository.AppRuleRepository
 import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.BlockedAttemptRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
-import com.minimalphone.core.domain.emergency.EmergencyAccessManager
 import com.minimalphone.core.data.repository.UsageStatsRepository
+import com.minimalphone.core.domain.emergency.EmergencyAccessManager
+import com.minimalphone.core.domain.quarantine.QuarantineEngine
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.BlockedAttempt
 import com.minimalphone.core.model.BypassDecision
@@ -21,7 +23,9 @@ class EvaluateBypassRouteUseCase @Inject constructor(
     private val focusSessionRepository: FocusSessionRepository,
     private val emergencyAccessManager: EmergencyAccessManager,
     private val appTimeLimitRepository: AppTimeLimitRepository,
-    private val usageStatsRepository: UsageStatsRepository
+    private val usageStatsRepository: UsageStatsRepository,
+    private val appRuleRepository: AppRuleRepository? = null,
+    private val quarantineEngine: QuarantineEngine = QuarantineEngine()
 ) {
     suspend operator fun invoke(packageName: String): BypassDecision {
         // 1. Ignore Minimal Phone launcher itself
@@ -37,6 +41,26 @@ class EvaluateBypassRouteUseCase @Inject constructor(
         // 3. Emergency/Essential apps always bypass — check EmergencyAccessManager first
         if (emergencyAccessManager.isEmergencyOrEssential(packageName)) {
             return BypassDecision.Allow
+        }
+
+        // 3.5 Check New-App Quarantine (M21)
+        val quarantineUntil = appRuleRepository?.getQuarantineUntil(packageName)
+        if (quarantineEngine.isQuarantined(quarantineUntil, System.currentTimeMillis())) {
+            val remainingText = quarantineEngine.remainingHours(quarantineUntil, System.currentTimeMillis())
+            val activeSession = focusSessionRepository.getActiveSessionSync()
+            val sessionToUse = activeSession ?: FocusSession(
+                id = "quarantine_$packageName",
+                startTime = System.currentTimeMillis(),
+                endTime = quarantineUntil ?: System.currentTimeMillis(),
+                durationMinutes = 0,
+                goal = FocusGoal("quarantine", "New App Quarantine ($remainingText remaining)", "Protection"),
+                mode = FocusMode.STRICT,
+                status = SessionStatus.ACTIVE
+            )
+            return BypassDecision.InterceptAndRedirect(
+                packageName = packageName,
+                session = sessionToUse
+            )
         }
 
         // 4. Check Per-App Daily Time Limits (Checked first before Focus session logic)
@@ -67,13 +91,13 @@ class EvaluateBypassRouteUseCase @Inject constructor(
             return BypassDecision.Allow
         }
 
-        // 5. Check if a Focus Session is currently active
+        // 6. Check if a Focus Session is currently active
         val activeSession = focusSessionRepository.getActiveSessionSync()
         if (activeSession == null || !activeSession.isCurrentlyActive) {
             return BypassDecision.Allow
         }
 
-        // 6. In STRICT and DEEP_FOCUS modes, intercept managed apps
+        // 7. In STRICT and DEEP_FOCUS modes, intercept managed apps
         return when (activeSession.mode) {
             FocusMode.LIGHT -> BypassDecision.Allow
             FocusMode.STRICT,
@@ -92,7 +116,6 @@ class EvaluateBypassRouteUseCase @Inject constructor(
                 packageName.startsWith("com.android.inputmethod")
     }
 }
-
 
 class RecordBypassAttemptUseCase @Inject constructor(
     private val appRepository: AppRepository,

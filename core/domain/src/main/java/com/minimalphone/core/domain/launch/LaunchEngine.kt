@@ -1,13 +1,15 @@
 package com.minimalphone.core.domain.launch
 
 import com.minimalphone.core.data.repository.AppRepository
+import com.minimalphone.core.data.repository.AppRuleRepository
 import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.BlockedAttemptRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
+import com.minimalphone.core.data.repository.UsageStatsRepository
 import com.minimalphone.core.domain.emergency.EmergencyAccessManager
+import com.minimalphone.core.domain.quarantine.QuarantineEngine
 import com.minimalphone.core.domain.rules.RuleContext
 import com.minimalphone.core.domain.rules.RuleEngine
-import com.minimalphone.core.data.repository.UsageStatsRepository
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.AppLaunchDecision
 import com.minimalphone.core.model.BlockedAttempt
@@ -18,8 +20,9 @@ import javax.inject.Inject
  *
  * All policy decisions flow through a strict priority chain:
  *   1. EmergencyAccessManager — system and user-configured essential apps (always allow)
- *   2. AppTimeLimitRepository — daily time limit enforcement with emergency extension
- *   3. RuleEngine             — all other rules (focus session, budget M14, schedule M15, dumb mode M16…)
+ *   2. QuarantineEngine (M21) — new apps under quarantine hold
+ *   3. AppTimeLimitRepository — daily time limit enforcement with emergency extension
+ *   4. RuleEngine             — all other rules (focus session, budget M14, schedule M15, dumb mode M16…)
  *
  * This use case is the ONLY entry point for launch decisions.
  */
@@ -29,7 +32,9 @@ class EvaluateAppLaunchUseCase @Inject constructor(
     private val emergencyAccessManager: EmergencyAccessManager,
     private val ruleEngine: RuleEngine,
     private val appTimeLimitRepository: AppTimeLimitRepository,
-    private val usageStatsRepository: UsageStatsRepository
+    private val usageStatsRepository: UsageStatsRepository,
+    private val appRuleRepository: AppRuleRepository? = null,
+    private val quarantineEngine: QuarantineEngine = QuarantineEngine()
 ) {
     suspend operator fun invoke(packageName: String): AppLaunchDecision {
         // App must be in DB to be launched
@@ -40,7 +45,7 @@ class EvaluateAppLaunchUseCase @Inject constructor(
                 activeSession = null
             )
 
-        // Check Per-App Daily Time Limits (Applies to all configured apps)
+        // 1. Check Per-App Daily Time Limits (Applies to all configured apps)
         val timeLimit = appTimeLimitRepository.getLimit(packageName)
         if (timeLimit != null && timeLimit.isEnabled && timeLimit.effectiveDailyLimitMinutes > 0) {
             val usedMinutes = usageStatsRepository.getTodayUsageMinutes(packageName)
@@ -54,7 +59,7 @@ class EvaluateAppLaunchUseCase @Inject constructor(
             }
         }
 
-        // Emergency / Essential apps bypass Focus Sessions and Dumb Mode
+        // 2. Emergency / Essential apps bypass Focus Sessions, Quarantine, and Dumb Mode
         if (emergencyAccessManager.isEmergencyOrEssential(packageName)) {
             return AppLaunchDecision.EmergencyAllow(
                 packageName = packageName,
@@ -62,13 +67,33 @@ class EvaluateAppLaunchUseCase @Inject constructor(
             )
         }
 
-        // Delegate to RuleEngine (focus, budget M14, schedule M15, dumb mode M16…)
+        // 3. Quarantine check (M21): Block newly installed managed apps during quarantine
+        val quarantineUntil = appRuleRepository?.getQuarantineUntil(packageName)
+        if (quarantineEngine.isQuarantined(quarantineUntil, System.currentTimeMillis())) {
+            val remaining = quarantineEngine.remainingHours(quarantineUntil, System.currentTimeMillis())
+            val activeSession = focusSessionRepository.getActiveSessionSync()
+            return AppLaunchDecision.Block(
+                packageName = packageName,
+                reason = "App is currently in quarantine (Available in $remaining).",
+                activeSession = activeSession
+            )
+        }
+
+        // 4. Delegate to RuleEngine (focus, budget M14, schedule M15, dumb mode M16…)
         val activeSession = focusSessionRepository.getActiveSessionSync()
         val context = RuleContext(
             app = app,
             activeSession = activeSession
         )
         return ruleEngine.evaluate(context)
+    }
+}
+
+class RecordBlockedAttemptUseCase @Inject constructor(
+    private val blockedAttemptRepository: BlockedAttemptRepository
+) {
+    suspend operator fun invoke(attempt: BlockedAttempt) {
+        blockedAttemptRepository.recordBlockedAttempt(attempt)
     }
 }
 
@@ -97,13 +122,5 @@ class LaunchAppUseCase @Inject constructor(
         }
 
         return decision
-    }
-}
-
-class RecordBlockedAttemptUseCase @Inject constructor(
-    private val blockedAttemptRepository: BlockedAttemptRepository
-) {
-    suspend operator fun invoke(attempt: BlockedAttempt) {
-        blockedAttemptRepository.recordBlockedAttempt(attempt)
     }
 }
