@@ -96,6 +96,7 @@ fun SettingsScreen(
     onNavigateToAppsManagement: () -> Unit,
     onNavigateToDiagnostics: () -> Unit,
     onNavigateToOnboarding: () -> Unit,
+    onNavigateToBypassProtection: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val settings by viewModel.settingsState.collectAsStateWithLifecycle()
@@ -249,6 +250,7 @@ fun SettingsScreen(
                             isDndGranted = isDndGranted,
                             onGrantDnd = { com.minimalphone.core.common.DndHelper.openNotificationPolicySettings(context) },
                             onNavigateToDiagnostics = onNavigateToDiagnostics,
+                            onNavigateToBypassProtection = onNavigateToBypassProtection,
                             onReplayOnboarding = { viewModel.onReplayOnboarding(onNavigateToOnboarding) }
                         )
                     }
@@ -635,6 +637,7 @@ private fun SystemPermissionsSettingsView(
     isDndGranted: Boolean,
     onGrantDnd: () -> Unit,
     onNavigateToDiagnostics: () -> Unit,
+    onNavigateToBypassProtection: () -> Unit,
     onReplayOnboarding: () -> Unit
 ) {
     LazyColumn(
@@ -650,6 +653,14 @@ private fun SystemPermissionsSettingsView(
                 title = "Diagnostics & OEM Resilience",
                 subtitle = "Inspect live permissions, accessibility backstop, and battery exemptions.",
                 onClick = onNavigateToDiagnostics
+            )
+        }
+
+        item {
+            NavigationActionCard(
+                title = "Bypass Protection (M21)",
+                subtitle = "Settings Guard, Uninstall Lock, and New-App Quarantine.",
+                onClick = onNavigateToBypassProtection
             )
         }
 

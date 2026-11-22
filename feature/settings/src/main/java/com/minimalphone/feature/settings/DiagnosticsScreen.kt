@@ -146,6 +146,41 @@ fun DiagnosticsScreen(
                     )
                 }
 
+                // Diagnostic Check 5: Settings Guard (M21)
+                item {
+                    DiagnosticItemCard(
+                        title = "Settings Guard",
+                        description = "Guards against disabling Accessibility and settings alterations during deep focus sessions.",
+                        isPassed = state.isSettingsGuardReady,
+                        actionLabel = if (state.isSettingsGuardReady) "READY" else "INACTIVE",
+                        onActionClick = { viewModel.openAccessibilitySettings() }
+                    )
+                }
+
+                // Diagnostic Check 6: Uninstall Lock (M21)
+                item {
+                    DiagnosticItemCard(
+                        title = "Uninstall Lock (Device Admin)",
+                        description = "Requires completing escalating friction before NumbPhone can be uninstalled.",
+                        isPassed = state.isUninstallLockActive,
+                        actionLabel = if (state.isUninstallLockActive) "ACTIVE" else "OPTIONAL (OFF)",
+                        onActionClick = {}
+                    )
+                }
+
+                // Diagnostic Check 7: Unreviewed Quarantined Apps (M21)
+                if (state.unreviewedQuarantinedAppsCount > 0) {
+                    item {
+                        DiagnosticItemCard(
+                            title = "New-App Quarantine",
+                            description = "${state.unreviewedQuarantinedAppsCount} newly installed app(s) under quarantine hold.",
+                            isPassed = true,
+                            actionLabel = "${state.unreviewedQuarantinedAppsCount} QUARANTINED",
+                            onActionClick = {}
+                        )
+                    }
+                }
+
                 // OEM Specific Guidance Banner
                 state.oemGuidance?.let { guidance ->
                     item {

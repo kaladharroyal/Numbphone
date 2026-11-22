@@ -255,6 +255,18 @@ fun AppsManagementScreen(
                         labelColor = MutedText
                     )
                 )
+
+                FilterChip(
+                    selected = uiState.activeFilter == AppListFilter.QUARANTINED,
+                    onClick = { viewModel.onFilterSelected(AppListFilter.QUARANTINED) },
+                    label = { Text("Quarantined (${uiState.quarantinedCount})") },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        labelColor = MutedText
+                    )
+                )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -385,13 +397,23 @@ fun AppManagementRow(
                 color = MaterialTheme.colorScheme.onBackground
             )
             
+            val now = System.currentTimeMillis()
+            val qUntil = app.quarantineUntil
+            val isQuarantined = qUntil != null && qUntil > now
+            val quarantineSubtitle = if (isQuarantined && qUntil != null) {
+                val remainingMins = ((qUntil - now) / 60000L).coerceAtLeast(1L)
+                val remainingHours = remainingMins / 60L
+                val timeStr = if (remainingHours > 0) "${remainingHours}h ${remainingMins % 60}m" else "${remainingMins}m"
+                " • 🛡️ Quarantined ($timeStr remaining)"
+            } else ""
+
             val statusSubtitle = if (isEssential) "Always Available (Essential)" else "Managed (Blocked in focus)"
             val limitSubtitle = if (timeLimit != null) " • ⏳ Limit: ${timeLimit.formattedLimit} (${todayUsedMinutes}m used)" else ""
             
             Text(
-                text = statusSubtitle + limitSubtitle,
+                text = statusSubtitle + limitSubtitle + quarantineSubtitle,
                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
-                color = if (timeLimit != null) Color(0xFFFF9F0A) else if (isEssential) Color(0xFF32D74B) else MutedText
+                color = if (isQuarantined) Color(0xFFFF453A) else if (timeLimit != null) Color(0xFFFF9F0A) else if (isEssential) Color(0xFF32D74B) else MutedText
             )
         }
 

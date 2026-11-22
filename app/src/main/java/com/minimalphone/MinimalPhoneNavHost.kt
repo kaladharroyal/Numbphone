@@ -41,6 +41,7 @@ sealed class Screen(val route: String) {
     data object Diagnostics : Screen("diagnostics")
     data object Settings : Screen("settings")
     data object Onboarding : Screen("onboarding")
+    data object BypassProtection : Screen("bypass_protection")
 }
 
 @HiltViewModel
@@ -132,6 +133,9 @@ fun MinimalPhoneNavHost(
                 onNavigateToDiagnostics = {
                     navController.navigate(Screen.Diagnostics.route)
                 },
+                onNavigateToBypassProtection = {
+                    navController.navigate(Screen.BypassProtection.route)
+                },
                 onNavigateToOnboarding = {
                     navController.navigate(Screen.Onboarding.route) {
                         popUpTo(Screen.Home.route) { inclusive = false }
@@ -170,6 +174,14 @@ fun MinimalPhoneNavHost(
         composable(Screen.Diagnostics.route) {
             DiagnosticsScreen(
                 onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.BypassProtection.route) {
+            com.minimalphone.feature.settings.BypassProtectionScreen(
+                onBack = {
                     navController.popBackStack()
                 }
             )

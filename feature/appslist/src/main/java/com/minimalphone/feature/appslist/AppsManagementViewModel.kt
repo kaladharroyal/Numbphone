@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.minimalphone.core.data.repository.AppRepository
 import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.UsageStatsRepository
+import com.minimalphone.core.domain.quarantine.QuarantineEngine
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.AppTimeLimit
 import com.minimalphone.core.model.InstalledApp
@@ -21,7 +22,8 @@ enum class AppListFilter {
     ALL,
     HOME,
     ESSENTIAL,
-    MANAGED
+    MANAGED,
+    QUARANTINED
 }
 
 data class AppsManagementUiState(
@@ -32,6 +34,7 @@ data class AppsManagementUiState(
     val homeAppsCount: Int = 0,
     val essentialCount: Int = 0,
     val managedCount: Int = 0,
+    val quarantinedCount: Int = 0,
     val limitsMap: Map<String, AppTimeLimit> = emptyMap(),
     val usageMinutesMap: Map<String, Long> = emptyMap()
 )
@@ -40,7 +43,8 @@ data class AppsManagementUiState(
 class AppsManagementViewModel @Inject constructor(
     private val appRepository: AppRepository,
     private val appTimeLimitRepository: AppTimeLimitRepository,
-    private val usageStatsRepository: UsageStatsRepository
+    private val usageStatsRepository: UsageStatsRepository,
+    private val quarantineEngine: QuarantineEngine = QuarantineEngine()
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
@@ -53,6 +57,7 @@ class AppsManagementViewModel @Inject constructor(
         appTimeLimitRepository.observeAllLimits(),
         usageStatsRepository.getDailyUsageSummary()
     ) { allApps, query, filter, limits, usageSummary ->
+        val now = System.currentTimeMillis()
         val filtered = allApps.filter { app ->
             val matchesQuery = query.isBlank() ||
                     app.label.contains(query, ignoreCase = true) ||
@@ -63,6 +68,7 @@ class AppsManagementViewModel @Inject constructor(
                 AppListFilter.HOME -> app.isFavoriteOnHome
                 AppListFilter.ESSENTIAL -> app.category == AppCategory.ESSENTIAL
                 AppListFilter.MANAGED -> app.category == AppCategory.MANAGED
+                AppListFilter.QUARANTINED -> quarantineEngine.isQuarantined(app.quarantineUntil, now)
             }
 
             matchesQuery && matchesFilter
@@ -79,6 +85,7 @@ class AppsManagementViewModel @Inject constructor(
             homeAppsCount = allApps.count { it.isFavoriteOnHome },
             essentialCount = allApps.count { it.category == AppCategory.ESSENTIAL },
             managedCount = allApps.count { it.category == AppCategory.MANAGED },
+            quarantinedCount = allApps.count { quarantineEngine.isQuarantined(it.quarantineUntil, now) },
             limitsMap = limitsMap,
             usageMinutesMap = usageMap
         )
@@ -92,24 +99,42 @@ class AppsManagementViewModel @Inject constructor(
         _searchQuery.value = query
     }
 
+    fun onSearchQueryChange(query: String) = onSearchQueryChanged(query)
+
     fun onFilterSelected(filter: AppListFilter) {
         _activeFilter.value = filter
     }
 
-    fun toggleAppCategory(app: InstalledApp) {
+    fun onFilterSelect(filter: AppListFilter) = onFilterSelected(filter)
+
+    fun refreshApps() {
         viewModelScope.launch {
-            val newCategory = if (app.category == AppCategory.ESSENTIAL) {
+            appRepository.syncInstalledApps()
+        }
+    }
+
+    fun toggleAppCategory(app: InstalledApp) {
+        toggleAppCategory(app.packageName, app.category)
+    }
+
+    fun toggleAppCategory(packageName: String, currentCategory: AppCategory) {
+        viewModelScope.launch {
+            val newCategory = if (currentCategory == AppCategory.ESSENTIAL) {
                 AppCategory.MANAGED
             } else {
                 AppCategory.ESSENTIAL
             }
-            appRepository.updateAppCategory(app.packageName, newCategory)
+            appRepository.updateAppCategory(packageName, newCategory)
         }
     }
 
     fun toggleFavoriteOnHome(app: InstalledApp) {
+        toggleFavoriteOnHome(app.packageName, app.isFavoriteOnHome)
+    }
+
+    fun toggleFavoriteOnHome(packageName: String, currentFavorite: Boolean) {
         viewModelScope.launch {
-            appRepository.toggleFavoriteOnHome(app.packageName, !app.isFavoriteOnHome)
+            appRepository.toggleFavoriteOnHome(packageName, !currentFavorite)
         }
     }
 
@@ -125,9 +150,7 @@ class AppsManagementViewModel @Inject constructor(
         }
     }
 
-    fun refreshApps() {
-        viewModelScope.launch {
-            appRepository.syncInstalledApps()
-        }
+    fun formatRemainingQuarantine(quarantineUntil: Long?): String {
+        return quarantineEngine.remainingHours(quarantineUntil, System.currentTimeMillis())
     }
 }
