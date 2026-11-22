@@ -9,7 +9,10 @@ data class BehavioralInsights(
     val totalFocusMinutesToday: Int = 0,
     val focusSessionCountToday: Int = 0,
     val totalReflectionsCountToday: Int = 0,
-    val dailyProgressVsAverage: Int = 0 // percent change vs 7-day average
+    val dailyProgressVsAverage: Int = 0, // percent change vs 7-day average
+    val totalPausesShownToday: Int = 0,
+    val pausesWalkedAwayToday: Int = 0,
+    val walkAwayRatePercentToday: Int = 0
 )
 
 /**
@@ -23,5 +26,8 @@ data class WeeklyWellbeingReport(
     val totalFocusHours: Float = 0f,
     val totalDistractionsBlocked: Int = 0,
     val digitalBalanceScore: Int = 85, // 0 - 100 score
-    val keyTakeaway: String = "Great balance this week!"
+    val keyTakeaway: String = "Great balance this week!",
+    val weeklyPausesShown: Int = 0,
+    val weeklyPausesWalkedAway: Int = 0,
+    val weeklyWalkAwayRatePercent: Int = 0
 )

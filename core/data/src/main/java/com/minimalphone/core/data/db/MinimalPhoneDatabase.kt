@@ -46,9 +46,11 @@ import com.minimalphone.core.data.db.entity.QuickContactEntity
         FocusScheduleEntity::class,
         DigestNotificationEntity::class,
         QuickContactEntity::class,
-        AppTimeLimitEntity::class
+        AppTimeLimitEntity::class,
+        com.minimalphone.core.data.db.entity.AppPauseConfigEntity::class,
+        com.minimalphone.core.data.db.entity.PauseEventEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(MinimalConverters::class)
@@ -65,6 +67,8 @@ abstract class MinimalPhoneDatabase : RoomDatabase() {
     abstract fun digestNotificationDao(): DigestNotificationDao
     abstract fun quickContactDao(): QuickContactDao
     abstract fun appTimeLimitDao(): AppTimeLimitDao
+    abstract fun appPauseConfigDao(): com.minimalphone.core.data.db.dao.AppPauseConfigDao
+    abstract fun pauseEventDao(): com.minimalphone.core.data.db.dao.PauseEventDao
 
     companion object {
         const val DATABASE_NAME = "minimal_phone.db"
@@ -77,6 +81,37 @@ abstract class MinimalPhoneDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE installed_apps ADD COLUMN quarantineUntil INTEGER DEFAULT NULL")
                 db.execSQL("ALTER TABLE installed_apps ADD COLUMN isClone INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE exit_attempts ADD COLUMN route TEXT NOT NULL DEFAULT 'FOCUS_SESSION'")
+            }
+        }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `app_pause_configs` (
+                        `packageName` TEXT NOT NULL,
+                        `enabled` INTEGER NOT NULL DEFAULT 1,
+                        `pauseSeconds` INTEGER NOT NULL DEFAULT 5,
+                        `style` TEXT NOT NULL DEFAULT 'BREATHE',
+                        `sessionMinutes` INTEGER NOT NULL DEFAULT 10,
+                        `reinterventionEnabled` INTEGER NOT NULL DEFAULT 1,
+                        PRIMARY KEY(`packageName`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `pause_events` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `packageName` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `kind` TEXT NOT NULL,
+                        `outcome` TEXT NOT NULL,
+                        `reflectionReason` TEXT,
+                        `secondsShown` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
             }
         }
     }

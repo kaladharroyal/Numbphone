@@ -171,6 +171,9 @@ interface DailyAppUsageDao {
     @Query("SELECT * FROM daily_app_usage WHERE packageName = :packageName AND date = :date LIMIT 1")
     suspend fun getUsage(packageName: String, date: String): com.minimalphone.core.data.db.entity.DailyAppUsageEntity?
 
+    @Query("SELECT launchCount FROM daily_app_usage WHERE packageName = :packageName AND date = :date LIMIT 1")
+    suspend fun getLaunchCount(packageName: String, date: String): Int?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(usage: com.minimalphone.core.data.db.entity.DailyAppUsageEntity)
 
@@ -292,4 +295,44 @@ interface AppTimeLimitDao {
 
     @Query("DELETE FROM app_time_limits WHERE packageName = :packageName")
     suspend fun deleteLimit(packageName: String)
+}
+
+// ─────────── M22: Mindful Pause & Re-Intervention ───────────
+
+@Dao
+interface AppPauseConfigDao {
+
+    @Query("SELECT * FROM app_pause_configs WHERE packageName = :packageName LIMIT 1")
+    suspend fun get(packageName: String): com.minimalphone.core.data.db.entity.AppPauseConfigEntity?
+
+    @Query("SELECT * FROM app_pause_configs WHERE packageName = :packageName LIMIT 1")
+    fun observe(packageName: String): Flow<com.minimalphone.core.data.db.entity.AppPauseConfigEntity?>
+
+    @Query("SELECT * FROM app_pause_configs")
+    fun observeAll(): Flow<List<com.minimalphone.core.data.db.entity.AppPauseConfigEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(config: com.minimalphone.core.data.db.entity.AppPauseConfigEntity)
+
+    @Query("DELETE FROM app_pause_configs WHERE packageName = :packageName")
+    suspend fun delete(packageName: String)
+}
+
+@Dao
+interface PauseEventDao {
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(event: com.minimalphone.core.data.db.entity.PauseEventEntity)
+
+    @Query("SELECT * FROM pause_events ORDER BY timestamp DESC LIMIT :limit")
+    fun observeRecent(limit: Int = 50): Flow<List<com.minimalphone.core.data.db.entity.PauseEventEntity>>
+
+    @Query("SELECT * FROM pause_events WHERE timestamp >= :sinceTimestamp")
+    suspend fun getEventsSince(sinceTimestamp: Long): List<com.minimalphone.core.data.db.entity.PauseEventEntity>
+
+    @Query("SELECT COUNT(*) FROM pause_events")
+    fun observeTotalPausesCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM pause_events WHERE outcome = 'LEFT'")
+    fun observeLeftCount(): Flow<Int>
 }

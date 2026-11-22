@@ -179,3 +179,26 @@ data class AppTimeLimitEntity(
     val emergencyExtensionMinutes: Int = 0,
     val lastExtensionDateMillis: Long = 0L
 )
+
+// ─────────── M22: Mindful Pause & Re-Intervention ───────────
+
+@Entity(tableName = "app_pause_configs")
+data class AppPauseConfigEntity(
+    @PrimaryKey val packageName: String,
+    val enabled: Boolean = true,
+    val pauseSeconds: Int = 5,
+    val style: String = "BREATHE",
+    val sessionMinutes: Int = 10,
+    val reinterventionEnabled: Boolean = true
+)
+
+@Entity(tableName = "pause_events")
+data class PauseEventEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    val packageName: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val kind: String = "LAUNCH",
+    val outcome: String = "PROCEEDED",
+    val reflectionReason: String? = null,
+    val secondsShown: Int = 0
+)

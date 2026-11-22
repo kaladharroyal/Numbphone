@@ -42,6 +42,11 @@ class DefaultSettingsRepository @Inject constructor(
         val SETTINGS_GUARD_MODE = stringPreferencesKey("settings_guard_mode")
         val QUARANTINE_HOURS = stringPreferencesKey("quarantine_hours")
         val UNINSTALL_LOCK_ENABLED = booleanPreferencesKey("uninstall_lock_enabled")
+        val PAUSE_GLOBAL_ENABLED = booleanPreferencesKey("pause_global_enabled")
+        val DEFAULT_PAUSE_SECONDS = intPreferencesKey("default_pause_seconds")
+        val DEFAULT_SESSION_MINUTES = intPreferencesKey("default_session_minutes")
+        val DEFAULT_PAUSE_STYLE = stringPreferencesKey("default_pause_style")
+        val PROGRESSIVE_DELAY_ENABLED = booleanPreferencesKey("progressive_delay_enabled")
     }
 
     override val isOnboardingCompleted: Flow<Boolean> = dataStore.data
@@ -134,6 +139,46 @@ class DefaultSettingsRepository @Inject constructor(
             preferences[PreferencesKeys.UNINSTALL_LOCK_ENABLED] ?: false
         }
 
+    override val pauseGlobalEnabled: Flow<Boolean> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.PAUSE_GLOBAL_ENABLED] ?: true
+        }
+
+    override val defaultPauseSeconds: Flow<Int> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.DEFAULT_PAUSE_SECONDS] ?: 5
+        }
+
+    override val defaultSessionMinutes: Flow<Int> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.DEFAULT_SESSION_MINUTES] ?: 10
+        }
+
+    override val defaultPauseStyle: Flow<com.minimalphone.core.model.PauseStyle> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            com.minimalphone.core.model.PauseStyle.fromName(preferences[PreferencesKeys.DEFAULT_PAUSE_STYLE])
+        }
+
+    override val progressiveDelayEnabled: Flow<Boolean> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) emit(emptyPreferences()) else throw exception
+        }
+        .map { preferences ->
+            preferences[PreferencesKeys.PROGRESSIVE_DELAY_ENABLED] ?: false
+        }
+
     override suspend fun setOnboardingCompleted(completed: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.ONBOARDING_COMPLETED] = completed
@@ -191,6 +236,36 @@ class DefaultSettingsRepository @Inject constructor(
     override suspend fun setUninstallLockEnabled(enabled: Boolean) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.UNINSTALL_LOCK_ENABLED] = enabled
+        }
+    }
+
+    override suspend fun setPauseGlobalEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.PAUSE_GLOBAL_ENABLED] = enabled
+        }
+    }
+
+    override suspend fun setDefaultPauseSeconds(seconds: Int) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DEFAULT_PAUSE_SECONDS] = seconds
+        }
+    }
+
+    override suspend fun setDefaultSessionMinutes(minutes: Int) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DEFAULT_SESSION_MINUTES] = minutes
+        }
+    }
+
+    override suspend fun setDefaultPauseStyle(style: com.minimalphone.core.model.PauseStyle) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DEFAULT_PAUSE_STYLE] = style.name
+        }
+    }
+
+    override suspend fun setProgressiveDelayEnabled(enabled: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.PROGRESSIVE_DELAY_ENABLED] = enabled
         }
     }
 }

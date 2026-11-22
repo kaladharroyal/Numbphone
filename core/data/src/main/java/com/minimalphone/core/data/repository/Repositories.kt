@@ -58,6 +58,11 @@ interface SettingsRepository {
     val settingsGuardMode: Flow<com.minimalphone.core.model.SettingsGuardMode>
     val quarantineHours: Flow<com.minimalphone.core.model.QuarantineHours>
     val uninstallLockEnabled: Flow<Boolean>
+    val pauseGlobalEnabled: Flow<Boolean>
+    val defaultPauseSeconds: Flow<Int>
+    val defaultSessionMinutes: Flow<Int>
+    val defaultPauseStyle: Flow<com.minimalphone.core.model.PauseStyle>
+    val progressiveDelayEnabled: Flow<Boolean>
 
     suspend fun setOnboardingCompleted(completed: Boolean)
     suspend fun setAdaptiveFrictionEnabled(enabled: Boolean)
@@ -69,6 +74,25 @@ interface SettingsRepository {
     suspend fun setSettingsGuardMode(mode: com.minimalphone.core.model.SettingsGuardMode)
     suspend fun setQuarantineHours(hours: com.minimalphone.core.model.QuarantineHours)
     suspend fun setUninstallLockEnabled(enabled: Boolean)
+    suspend fun setPauseGlobalEnabled(enabled: Boolean)
+    suspend fun setDefaultPauseSeconds(seconds: Int)
+    suspend fun setDefaultSessionMinutes(minutes: Int)
+    suspend fun setDefaultPauseStyle(style: com.minimalphone.core.model.PauseStyle)
+    suspend fun setProgressiveDelayEnabled(enabled: Boolean)
+}
+
+/**
+ * Manages mindful pause configurations, session grants, and reflection events (M22).
+ */
+interface PauseRepository {
+    fun observeAppPauseConfig(packageName: String): Flow<com.minimalphone.core.model.PauseConfig?>
+    suspend fun getAppPauseConfigSync(packageName: String): com.minimalphone.core.model.PauseConfig?
+    suspend fun saveAppPauseConfig(config: com.minimalphone.core.model.PauseConfig)
+    fun observeAllConfigs(): Flow<List<com.minimalphone.core.model.PauseConfig>>
+    suspend fun recordPauseEvent(event: com.minimalphone.core.model.PauseEvent)
+    fun observeTotalPausesCount(): Flow<Int>
+    fun observeWalkAwayCount(): Flow<Int>
+    suspend fun getEventsSince(sinceTimestamp: Long): List<com.minimalphone.core.model.PauseEvent>
 }
 
 /**

@@ -41,6 +41,7 @@ sealed interface AppLaunchDecision {
     data class EmergencyAllow(val packageName: String, val activityName: String) : AppLaunchDecision
     data class Block(val packageName: String, val reason: String, val activeSession: FocusSession?) : AppLaunchDecision
     data class ShowFriction(val packageName: String, val activeSession: FocusSession, val frictionSeconds: Int) : AppLaunchDecision
+    data class ShowPause(val packageName: String, val activityName: String, val config: PauseConfig, val delaySeconds: Int) : AppLaunchDecision
 }
 
 enum class BypassRoute {

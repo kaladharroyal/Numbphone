@@ -30,7 +30,10 @@ object DatabaseModule {
             context,
             MinimalPhoneDatabase::class.java,
             MinimalPhoneDatabase.DATABASE_NAME
-        ).addMigrations(MinimalPhoneDatabase.MIGRATION_8_9)
+        ).addMigrations(
+            MinimalPhoneDatabase.MIGRATION_8_9,
+            MinimalPhoneDatabase.MIGRATION_9_10
+        )
          .fallbackToDestructiveMigration()
          .build()
     }
@@ -70,4 +73,10 @@ object DatabaseModule {
 
     @Provides
     fun provideAppTimeLimitDao(db: MinimalPhoneDatabase): com.minimalphone.core.data.db.dao.AppTimeLimitDao = db.appTimeLimitDao()
+
+    @Provides
+    fun provideAppPauseConfigDao(db: MinimalPhoneDatabase): com.minimalphone.core.data.db.dao.AppPauseConfigDao = db.appPauseConfigDao()
+
+    @Provides
+    fun providePauseEventDao(db: MinimalPhoneDatabase): com.minimalphone.core.data.db.dao.PauseEventDao = db.pauseEventDao()
 }

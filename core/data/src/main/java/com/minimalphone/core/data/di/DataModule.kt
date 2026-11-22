@@ -99,4 +99,10 @@ object DataModule {
     fun provideContactRepository(
         impl: com.minimalphone.core.data.repository.DefaultContactRepository
     ): com.minimalphone.core.data.repository.ContactRepository = impl
+
+    @Provides
+    @Singleton
+    fun providePauseRepository(
+        impl: com.minimalphone.core.data.repository.DefaultPauseRepository
+    ): com.minimalphone.core.data.repository.PauseRepository = impl
 }
