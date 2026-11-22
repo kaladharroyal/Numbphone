@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -1560,17 +1561,27 @@ private fun AddTimeLimitDialog(
 }
 
 @Composable
-private fun SuggestionsAndTipsCard(
-    onOpenFeedback: () -> Unit
+private fun SettingsCard(
+    modifier: Modifier = Modifier,
+    spacedBy: androidx.compose.ui.unit.Dp = 12.dp,
+    content: @Composable ColumnScope.() -> Unit
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
             .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
             .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+        verticalArrangement = Arrangement.spacedBy(spacedBy),
+        content = content
+    )
+}
+
+@Composable
+private fun SuggestionsAndTipsCard(
+    onOpenFeedback: () -> Unit
+) {
+    SettingsCard {
         Text(
             text = "Study & Focus Techniques",
             style = MaterialTheme.typography.titleMedium,
@@ -1600,14 +1611,7 @@ private fun BackupActionsCard(
     onExport: () -> Unit,
     onImport: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    SettingsCard {
         Text(
             text = "Local-First Configuration Portability",
             style = MaterialTheme.typography.titleMedium,
@@ -1663,14 +1667,7 @@ private fun BackupActionsCard(
 
 @Composable
 private fun PrivacyCharterCard() {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp))
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
+    SettingsCard(spacedBy = 8.dp) {
         Text(
             text = "100% On-Device Privacy Guarantee",
             style = MaterialTheme.typography.titleMedium,

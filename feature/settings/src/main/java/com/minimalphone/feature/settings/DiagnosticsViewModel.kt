@@ -8,7 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.minimalphone.core.common.AccessibilityHelper
 import com.minimalphone.core.common.SystemHealthHelper
-import com.minimalphone.core.domain.CheckUsagePermissionUseCase
+import com.minimalphone.core.data.repository.UsageStatsRepository
 import com.minimalphone.core.domain.boot.ObserveSystemDiagnosticsUseCase
 import com.minimalphone.core.domain.boot.SystemDiagnosticsData
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,7 +23,7 @@ import javax.inject.Inject
 class DiagnosticsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val observeSystemDiagnosticsUseCase: ObserveSystemDiagnosticsUseCase,
-    private val checkUsagePermissionUseCase: CheckUsagePermissionUseCase
+    private val usageStatsRepository: UsageStatsRepository
 ) : ViewModel() {
 
     private val _diagnosticsState = MutableStateFlow(SystemDiagnosticsData())
@@ -37,7 +37,7 @@ class DiagnosticsViewModel @Inject constructor(
         viewModelScope.launch {
             val isDefaultLauncher = SystemHealthHelper.isDefaultLauncher(context)
             val isAccessibilityEnabled = isAccessibilityServiceEnabledInternal()
-            val isUsageGranted = checkUsagePermissionUseCase()
+            val isUsageGranted = usageStatsRepository.hasUsagePermission()
             val isBatteryIgnored = SystemHealthHelper.isBatteryOptimizationIgnored(context)
             val oem = Build.MANUFACTURER
             val model = Build.MODEL

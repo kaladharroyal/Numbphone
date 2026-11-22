@@ -5,17 +5,12 @@ import androidx.lifecycle.viewModelScope
 import com.minimalphone.core.data.repository.AppRepository
 import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.EssentialAppRepository
+import com.minimalphone.core.data.repository.SettingsRepository
 import com.minimalphone.core.domain.BackupExportResult
 import com.minimalphone.core.domain.BackupImportResult
 import com.minimalphone.core.domain.ExportBackupJsonUseCase
 import com.minimalphone.core.domain.GetSettingsUseCase
 import com.minimalphone.core.domain.ImportBackupJsonUseCase
-import com.minimalphone.core.domain.SetOnboardingCompletedUseCase
-import com.minimalphone.core.domain.UpdateAdaptiveFrictionUseCase
-import com.minimalphone.core.domain.UpdateAppThemeUseCase
-import com.minimalphone.core.domain.UpdateDefaultFocusDurationUseCase
-import com.minimalphone.core.domain.UpdateDumbModeUseCase
-import com.minimalphone.core.domain.UpdateLocalAnalyticsUseCase
 import com.minimalphone.core.domain.UserSettings
 import com.minimalphone.core.model.AppTheme
 import com.minimalphone.core.model.AppTimeLimit
@@ -33,13 +28,7 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val getSettingsUseCase: GetSettingsUseCase,
-    private val updateAdaptiveFrictionUseCase: UpdateAdaptiveFrictionUseCase,
-    private val updateDefaultFocusDurationUseCase: UpdateDefaultFocusDurationUseCase,
-    private val updateLocalAnalyticsUseCase: UpdateLocalAnalyticsUseCase,
-    private val updateAppThemeUseCase: UpdateAppThemeUseCase,
-    private val updateDumbModeUseCase: UpdateDumbModeUseCase,
-    private val updateAutoGrayscaleInFocusUseCase: com.minimalphone.core.domain.UpdateAutoGrayscaleInFocusUseCase,
-    private val setOnboardingCompletedUseCase: SetOnboardingCompletedUseCase,
+    private val settingsRepository: SettingsRepository,
     private val exportBackupJsonUseCase: ExportBackupJsonUseCase,
     private val importBackupJsonUseCase: ImportBackupJsonUseCase,
     private val essentialAppRepository: EssentialAppRepository,
@@ -90,37 +79,37 @@ class SettingsViewModel @Inject constructor(
 
     fun onToggleAdaptiveFriction(enabled: Boolean) {
         viewModelScope.launch {
-            updateAdaptiveFrictionUseCase(enabled)
+            settingsRepository.setAdaptiveFrictionEnabled(enabled)
         }
     }
 
     fun onSelectDefaultDuration(minutes: Int) {
         viewModelScope.launch {
-            updateDefaultFocusDurationUseCase(minutes)
+            settingsRepository.setDefaultFocusDurationMinutes(minutes)
         }
     }
 
     fun onToggleLocalAnalytics(enabled: Boolean) {
         viewModelScope.launch {
-            updateLocalAnalyticsUseCase(enabled)
+            settingsRepository.setLocalAnalyticsEnabled(enabled)
         }
     }
 
     fun onSelectTheme(theme: AppTheme) {
         viewModelScope.launch {
-            updateAppThemeUseCase(theme)
+            settingsRepository.setAppTheme(theme)
         }
     }
 
     fun onToggleDumbMode(enabled: Boolean) {
         viewModelScope.launch {
-            updateDumbModeUseCase(enabled)
+            settingsRepository.setDumbModeEnabled(enabled)
         }
     }
 
     fun onToggleAutoGrayscaleInFocus(enabled: Boolean) {
         viewModelScope.launch {
-            updateAutoGrayscaleInFocusUseCase(enabled)
+            settingsRepository.setAutoGrayscaleInFocusEnabled(enabled)
         }
     }
 
@@ -169,7 +158,7 @@ class SettingsViewModel @Inject constructor(
 
     fun onReplayOnboarding(onNavigateToOnboarding: () -> Unit) {
         viewModelScope.launch {
-            setOnboardingCompletedUseCase(false)
+            settingsRepository.setOnboardingCompleted(false)
             onNavigateToOnboarding()
         }
     }
