@@ -8,14 +8,19 @@ import com.minimalphone.core.common.MinimalLog
 import com.minimalphone.core.data.repository.AppRepository
 import com.minimalphone.core.data.repository.AppTimeLimitRepository
 import com.minimalphone.core.data.repository.FocusSessionRepository
+import com.minimalphone.core.data.repository.SettingsRepository
 import com.minimalphone.core.data.repository.UsageStatsRepository
 import com.minimalphone.core.domain.bypass.EvaluateBypassRouteUseCase
 import com.minimalphone.core.domain.bypass.RecordBypassAttemptUseCase
+import com.minimalphone.core.domain.bypass.SettingsGuardConfig
+import com.minimalphone.core.domain.bypass.SettingsGuardDecision
+import com.minimalphone.core.domain.bypass.SettingsGuardEngine
 import com.minimalphone.core.domain.timelimit.TimeLimitExpiryNotifier
 import com.minimalphone.core.model.AppCategory
 import com.minimalphone.core.model.BypassDecision
 import com.minimalphone.core.model.BypassRoute
 import com.minimalphone.core.model.FocusMode
+import com.minimalphone.core.model.SettingsGuardMode
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,8 +28,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -51,6 +58,12 @@ class MinimalAccessibilityService : AccessibilityService() {
     @Inject
     lateinit var timeLimitExpiryNotifier: TimeLimitExpiryNotifier
 
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
+
+    @Inject
+    lateinit var settingsGuardEngine: SettingsGuardEngine
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     // Debounce state to avoid redundant checks during rapid window transitions
@@ -62,9 +75,14 @@ class MinimalAccessibilityService : AccessibilityService() {
     private var activeMonitoringJob: Job? = null
     private var currentForegroundPackage: String? = null
 
+    // Cached Settings Guard configuration
+    private var cachedGuardConfig: SettingsGuardConfig? = null
+    private var guardConfigLoadedAt: Long = 0L
+
     companion object {
         private const val TAG = "BypassAccessibilityService"
         private const val DEBOUNCE_WINDOW_MS = 250L
+        private const val GUARD_CONFIG_TTL_MS = 24 * 60 * 60 * 1000L
     }
 
     override fun onServiceConnected() {
@@ -97,13 +115,51 @@ class MinimalAccessibilityService : AccessibilityService() {
             return
         }
 
-        // 2. Ignore transient system overlays, keyboards, input methods, and frameworks
-        // (Do NOT stop monitoring the active user app underneath!)
+        // 2. Settings Guard (M21) — Active only during active DEEP or DEEP_AND_STRICT sessions
+        serviceScope.launch {
+            try {
+                val guardMode = settingsRepository.settingsGuardMode.first()
+                if (guardMode != SettingsGuardMode.OFF) {
+                    val activeSession = focusSessionRepository.getActiveSessionSync()
+                    if (activeSession != null && activeSession.isCurrentlyActive) {
+                        val isGuardedSession = when (guardMode) {
+                            SettingsGuardMode.DEEP -> activeSession.mode == FocusMode.DEEP_FOCUS
+                            SettingsGuardMode.DEEP_AND_STRICT ->
+                                activeSession.mode == FocusMode.DEEP_FOCUS || activeSession.mode == FocusMode.STRICT
+                            SettingsGuardMode.OFF -> false
+                        }
+                        if (isGuardedSession) {
+                            val config = getOrLoadGuardConfig()
+                            when (val decision = settingsGuardEngine.evaluate(targetPackage, className, config)) {
+                                is SettingsGuardDecision.Block -> {
+                                    MinimalLog.w(TAG, "Settings Guard BLOCKED: $targetPackage / $className (${decision.route})")
+                                    returnToHomeScreen()
+                                    recordBypassAttemptUseCase(
+                                        packageName = targetPackage,
+                                        route = BypassRoute.SETTINGS_GUARD,
+                                        userIntentReason = "Settings Guard intercepted $className"
+                                    )
+                                    return@launch
+                                }
+                                is SettingsGuardDecision.AllowLogged -> {
+                                    MinimalLog.i(TAG, "Settings Guard: unknown settings class allowed and logged: $className")
+                                }
+                                is SettingsGuardDecision.Allow -> { /* Allowed */ }
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                MinimalLog.e(TAG, "Error evaluating Settings Guard", e)
+            }
+        }
+
+        // 3. Ignore transient system overlays, keyboards, input methods, and frameworks
         if (isSystemPackageWhitelisted(targetPackage)) {
             return
         }
 
-        // 3. Intercept System UI Recents Overview / Quick Settings / Notification Shade during active focus
+        // 4. Intercept System UI Recents Overview / Quick Settings / Notification Shade during active focus
         if (isSystemUiOrRecents(targetPackage, className)) {
             serviceScope.launch {
                 try {
@@ -128,7 +184,7 @@ class MinimalAccessibilityService : AccessibilityService() {
             return
         }
 
-        // 4. Evaluate bypass & time limit rules
+        // 5. Evaluate bypass & time limit rules
         serviceScope.launch {
             try {
                 when (val decision = evaluateBypassRouteUseCase(targetPackage)) {
@@ -139,20 +195,28 @@ class MinimalAccessibilityService : AccessibilityService() {
                         stopMonitoring()
                         val isLimitExpired = decision.session.id.startsWith("limit_") ||
                                 decision.session.goal.title == "Daily Limit Reached"
+                        val isQuarantine = decision.session.id.startsWith("quarantine_")
 
-                        MinimalLog.w(
-                            TAG,
-                            "Unauthorized access to '$targetPackage' (${if (isLimitExpired) "Daily Limit Reached" else "Focus Session"}). Intercepting."
-                        )
+                        val reason = when {
+                            isQuarantine -> "App in quarantine"
+                            isLimitExpired -> "Daily limit reached"
+                            else -> "Focus session active"
+                        }
 
-                        // 1. Record bypass attempt
+                        MinimalLog.w(TAG, "Unauthorized access to '$targetPackage' ($reason). Intercepting.")
+
+                        // Record bypass attempt with appropriate route
+                        val routeToRecord = when {
+                            isQuarantine -> BypassRoute.QUARANTINE
+                            else -> BypassRoute.RECENTS
+                        }
                         recordBypassAttemptUseCase(
                             packageName = targetPackage,
-                            route = BypassRoute.RECENTS,
-                            userIntentReason = if (isLimitExpired) "Daily limit reached" else "Focus active"
+                            route = routeToRecord,
+                            userIntentReason = reason
                         )
 
-                        // 2. Perform redirect
+                        // Perform redirect
                         if (isLimitExpired) {
                             val app = appRepository.getApp(targetPackage)
                             val label = app?.label ?: targetPackage.substringAfterLast('.')
@@ -165,6 +229,41 @@ class MinimalAccessibilityService : AccessibilityService() {
                 }
             } catch (e: Exception) {
                 MinimalLog.e(TAG, "Error evaluating bypass route for package: $targetPackage", e)
+            }
+        }
+    }
+
+    private fun getOrLoadGuardConfig(): SettingsGuardConfig {
+        val now = System.currentTimeMillis()
+        val cached = cachedGuardConfig
+        if (cached != null && (now - guardConfigLoadedAt) < GUARD_CONFIG_TTL_MS) {
+            return cached
+        }
+
+        return try {
+            val json = applicationContext.assets.open("settings_guard_classes.json").bufferedReader().readText()
+            val root = JSONObject(json)
+            fun parseList(key: String): List<String> {
+                val arr = root.getJSONArray(key)
+                return (0 until arr.length()).map { arr.getString(it) }
+            }
+            SettingsGuardConfig(
+                blockedClasses = parseList("blockedClasses"),
+                allowedClasses = parseList("allowedClasses"),
+                settingsPackages = parseList("settingsPackages")
+            ).also {
+                cachedGuardConfig = it
+                guardConfigLoadedAt = now
+            }
+        } catch (e: Exception) {
+            MinimalLog.e(TAG, "Failed to load guard config from assets, using defaults", e)
+            SettingsGuardConfig(
+                blockedClasses = listOf("AccessibilitySettings", "InstalledAppDetails", "UninstallerActivity", "PackageInstallerActivity"),
+                allowedClasses = listOf("WifiSettings", "BluetoothSettings", "DisplaySettings", "BatterySettings", "SoundSettings"),
+                settingsPackages = listOf("com.android.settings", "com.android.packageinstaller")
+            ).also {
+                cachedGuardConfig = it
+                guardConfigLoadedAt = now
             }
         }
     }
@@ -313,5 +412,3 @@ class MinimalAccessibilityService : AccessibilityService() {
         MinimalLog.i(TAG, "Minimal Phone Bypass Protection Service Destroyed.")
     }
 }
-
-
